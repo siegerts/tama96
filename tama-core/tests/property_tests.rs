@@ -835,6 +835,70 @@ proptest! {
 }
 
 
+// ── Property 15: Persistence round-trip ──────────────────────────────────────
+// **Validates: Requirements 6.1, 6.2, 6.5**
+
+proptest! {
+    #[test]
+    fn prop_persistence_round_trip(state in arb_valid_pet_state()) {
+        // Serialize to JSON (Requirement 6.1)
+        let json = serde_json::to_string(&state)
+            .expect("PetState should serialize to JSON");
+
+        // Deserialize from JSON (Requirement 6.2)
+        let deserialized: PetState = serde_json::from_str(&json)
+            .expect("PetState JSON should deserialize back");
+
+        // Requirement 6.5: round-trip produces an equivalent PetState
+        prop_assert_eq!(
+            state, deserialized,
+            "PetState should be equivalent after serialize → deserialize round-trip"
+        );
+    }
+}
+
+
+// ── Property 16: Catch-up convergence ────────────────────────────────────────
+// **Validates: Requirements 6.3, 6.4**
+
+proptest! {
+    #[test]
+    fn prop_catchup_convergence(state in arb_valid_pet_state(), elapsed_minutes in 0u64..=120) {
+        // Use a well-defined base time for last_tick to avoid edge cases
+        let base_time = Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+        let mut state = state;
+        state.last_tick = base_time;
+        // Ensure birth_time and stage_start_time are not in the future relative to last_tick
+        state.birth_time = base_time;
+        state.stage_start_time = base_time;
+        state.last_poop_time = base_time;
+
+        let now = base_time + chrono::Duration::minutes(elapsed_minutes as i64);
+
+        // Create a unique temp directory for this test run
+        let dir = std::env::temp_dir().join(format!("tama96_prop16_{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+
+        // Save the state
+        tama_core::persistence::save(&state, &path).unwrap();
+
+        // Load with catch-up
+        let loaded = tama_core::persistence::load(&path, now).unwrap();
+
+        // Requirement 6.3 & 6.4: After catch-up, last_tick must equal `now`
+        prop_assert_eq!(
+            loaded.last_tick, now,
+            "After catch-up with {} elapsed minutes, last_tick should be {:?}, got {:?}",
+            elapsed_minutes, now, loaded.last_tick
+        );
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+
 // ── Unit tests: Evolution paths ─────────────────────────────────────────────
 // **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7**
 
@@ -1348,5 +1412,195 @@ mod evolution_tests {
         assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 2), Character::Nyorotchi);
         assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 3), Character::Nyorotchi);
         assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 4), Character::Tarakotchi);
+    }
+}
+
+
+// ── Property 17: Lockfile mutual exclusion ──────────────────────────────────
+// **Validates: Requirement 7.4**
+
+proptest! {
+    /// For any sequence of acquire/release cycles, at most one process holds the lock at any time.
+    /// A second acquire while the first guard is alive must fail with AlreadyLocked.
+    /// After release (drop), a new acquire must succeed.
+    #[test]
+    fn prop_lockfile_mutual_exclusion(cycles in 1u8..=10) {
+        let dir = std::env::temp_dir().join(format!("tama96_prop17_{}", rand::random::<u64>()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let lock_path = dir.join("tama96.lock");
+
+        for _ in 0..cycles {
+            // Acquire the lock — must succeed since no one holds it
+            let guard = tama_core::persistence::acquire_lock(&lock_path)
+                .expect("acquire_lock should succeed when no lock is held");
+
+            // Lock file should exist and contain our PID
+            prop_assert!(lock_path.exists(), "lock file should exist after acquire");
+            let contents = std::fs::read_to_string(&lock_path).unwrap();
+            let pid: u32 = contents.trim().parse().unwrap();
+            prop_assert_eq!(pid, std::process::id(), "lock file should contain our PID");
+
+            // A second acquire while the first guard is alive must fail with AlreadyLocked
+            let second = tama_core::persistence::acquire_lock(&lock_path);
+            prop_assert!(second.is_err(), "second acquire should fail while lock is held");
+            match second {
+                Err(tama_core::persistence::LockError::AlreadyLocked(msg)) => {
+                    prop_assert!(
+                        msg.contains("Another instance"),
+                        "AlreadyLocked message should mention 'Another instance', got: {}",
+                        msg
+                    );
+                }
+                Err(other) => {
+                    prop_assert!(false, "expected AlreadyLocked, got: {:?}", other);
+                }
+                Ok(_) => {
+                    prop_assert!(false, "second acquire should not succeed while lock is held");
+                }
+            }
+
+            // Release the lock (drop the guard)
+            tama_core::persistence::release_lock(guard);
+
+            // Lock file should be gone after release
+            prop_assert!(!lock_path.exists(), "lock file should be removed after release");
+        }
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+
+// ── ActionType generator ────────────────────────────────────────────────────
+
+fn arb_action_type() -> impl Strategy<Value = ActionType> {
+    prop_oneof![
+        Just(ActionType::FeedMeal),
+        Just(ActionType::FeedSnack),
+        Just(ActionType::PlayGame),
+        Just(ActionType::Discipline),
+        Just(ActionType::GiveMedicine),
+        Just(ActionType::CleanPoop),
+        Just(ActionType::ToggleLights),
+        Just(ActionType::GetStatus),
+    ]
+}
+
+
+// ── Property 18: Permission gating ──────────────────────────────────────────
+// **Validates: Requirements 8.1, 8.2**
+
+proptest! {
+    /// Master switch disabled returns MasterDisabled for any action type.
+    #[test]
+    fn prop_permission_master_disabled(action in arb_action_type()) {
+        let mut perms = AgentPermissions::default();
+        perms.enabled = false;
+        let now = Utc::now();
+
+        let result = tama_core::permissions::check_permission(&mut perms, &action, now);
+        prop_assert_eq!(
+            result,
+            Err(tama_core::permissions::PermissionDenied::MasterDisabled),
+            "With master switch disabled, check_permission should return MasterDisabled for {:?}",
+            action
+        );
+    }
+
+    /// Action disabled returns ActionDisabled with the action name.
+    #[test]
+    fn prop_permission_action_disabled(action in arb_action_type()) {
+        let mut perms = AgentPermissions::default();
+        // Master switch is on, but disable the specific action
+        perms.enabled = true;
+        perms.allowed_actions.get_mut(&action).unwrap().allowed = false;
+        let now = Utc::now();
+
+        let result = tama_core::permissions::check_permission(&mut perms, &action, now);
+        prop_assert_eq!(
+            result,
+            Err(tama_core::permissions::PermissionDenied::ActionDisabled(action.clone())),
+            "With action {:?} disabled, check_permission should return ActionDisabled",
+            action
+        );
+    }
+}
+
+
+// ── Property 19: Rate limiting ──────────────────────────────────────────────
+// **Validates: Requirement 8.3**
+
+proptest! {
+    /// If action_log contains n >= max_per_hour entries within the last hour,
+    /// check_permission returns RateLimited with correct limit and used values.
+    /// With fewer than limit entries, check_permission succeeds.
+    #[test]
+    fn prop_rate_limiting(
+        action in arb_action_type(),
+        limit in 1u32..=10,
+    ) {
+        let now = Utc::now();
+
+        // ── Case 1: Exactly `limit` entries → RateLimited ──────────────
+
+        let mut perms = AgentPermissions::default();
+        perms.enabled = true;
+        perms.allowed_actions.insert(
+            action.clone(),
+            tama_core::state::ActionPermission {
+                allowed: true,
+                max_per_hour: Some(limit),
+            },
+        );
+
+        // Log exactly `limit` actions within the last hour
+        for i in 0..limit {
+            tama_core::permissions::log_action(
+                &mut perms,
+                action.clone(),
+                now - chrono::Duration::minutes(i as i64),
+            );
+        }
+
+        let result = tama_core::permissions::check_permission(&mut perms, &action, now);
+        prop_assert_eq!(
+            result,
+            Err(tama_core::permissions::PermissionDenied::RateLimited {
+                action: action.clone(),
+                limit,
+                used: limit,
+            }),
+            "With {} entries (limit={}), check_permission should return RateLimited for {:?}",
+            limit, limit, action
+        );
+
+        // ── Case 2: Fewer than `limit` entries → Ok ────────────────────
+
+        let mut perms2 = AgentPermissions::default();
+        perms2.enabled = true;
+        perms2.allowed_actions.insert(
+            action.clone(),
+            tama_core::state::ActionPermission {
+                allowed: true,
+                max_per_hour: Some(limit),
+            },
+        );
+
+        // Log (limit - 1) actions within the last hour
+        for i in 0..(limit.saturating_sub(1)) {
+            tama_core::permissions::log_action(
+                &mut perms2,
+                action.clone(),
+                now - chrono::Duration::minutes(i as i64),
+            );
+        }
+
+        let result2 = tama_core::permissions::check_permission(&mut perms2, &action, now);
+        prop_assert!(
+            result2.is_ok(),
+            "With {} entries (limit={}), check_permission should succeed for {:?}, got {:?}",
+            limit.saturating_sub(1), limit, action, result2
+        );
     }
 }

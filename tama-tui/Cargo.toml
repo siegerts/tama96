@@ -8,3 +8,8 @@ tama-core = { path = "../tama-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+rand = { workspace = true }
+ratatui = "0.29"
+crossterm = "0.28"
+dirs = "5"
+log = { workspace = true }

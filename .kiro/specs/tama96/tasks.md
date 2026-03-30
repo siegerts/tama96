@@ -1,4 +1,4 @@
-# Implementation Plan: tama96
+ # Implementation Plan: tama96
 
 ## Overview
 
@@ -184,65 +184,65 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - Verify the full P1 branching matrix exhaustively
     - _Requirements: 4.1-4.7_
 
-- [ ] 7. Implement persistence and lockfile in tama-core
-  - [ ] 7.1 Implement save/load with atomic writes in `tama-core/src/persistence.rs`
+- [x] 7. Implement persistence and lockfile in tama-core
+  - [x] 7.1 Implement save/load with atomic writes in `tama-core/src/persistence.rs`
     - `save(state, path)`: serialize to JSON, write to temp file, rename to target (atomic)
     - `load(path, now)`: deserialize JSON, apply catch-up ticks from last_tick to now
     - Handle corrupt file: back up as `.corrupt`, log warning, return fresh egg
     - Handle clock skew: if now < last_tick, skip tick, log warning, set last_tick = now
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.6, 6.7_
 
-  - [ ] 7.2 Write property test: Persistence round-trip
+  - [x] 7.2 Write property test: Persistence round-trip
     - **Property 15: Persistence round-trip**
     - For any valid PetState, serialize to JSON then deserialize produces an equivalent PetState
     - **Validates: Requirements 6.1, 6.2, 6.5**
 
-  - [ ] 7.3 Write property test: Catch-up convergence
+  - [x] 7.3 Write property test: Catch-up convergence
     - **Property 16: Catch-up convergence**
     - For any saved PetState and elapsed time, loading with catch-up results in last_tick equal to current timestamp
     - **Validates: Requirements 6.3, 6.4**
 
-  - [ ] 7.4 Implement lockfile in `tama-core/src/persistence.rs`
+  - [x] 7.4 Implement lockfile in `tama-core/src/persistence.rs`
     - `acquire_lock(path)`: create lock file with PID, fail if already held by live process
     - `release_lock(guard)`: remove lock file
     - Implement `LockGuard` with Drop trait for automatic cleanup
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 7.5 Write property test: Lockfile mutual exclusion
+  - [x] 7.5 Write property test: Lockfile mutual exclusion
     - **Property 17: Lockfile mutual exclusion**
     - For any sequence of acquire/release operations, at most one process holds the lock at any time
     - **Validates: Requirement 7.4**
 
-- [ ] 8. Implement agent permission system in tama-core
-  - [ ] 8.1 Implement permission checking in `tama-core/src/permissions.rs`
+- [x] 8. Implement agent permission system in tama-core
+  - [x] 8.1 Implement permission checking in `tama-core/src/permissions.rs`
     - `check_permission(permissions, action, now)`: check master switch, check action allowed, check rate limit
     - Prune action_log entries older than 1 hour during each check
     - `log_action(permissions, action, now)`: append to action_log
     - `save_permissions` / `load_permissions`: persist to `~/.tama96/permissions.json`
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 8.2 Write property test: Permission gating
+  - [x] 8.2 Write property test: Permission gating
     - **Property 18: Permission gating**
     - Master switch disabled returns MasterDisabled. Action disabled returns PermissionDenied with action name
     - **Validates: Requirements 8.1, 8.2**
 
-  - [ ] 8.3 Write property test: Rate limiting
+  - [x] 8.3 Write property test: Rate limiting
     - **Property 19: Rate limiting**
     - If action_log contains n >= max_per_hour entries within last hour, next check returns RateLimited
     - **Validates: Requirement 8.3**
 
-- [ ] 9. Checkpoint - Core engine complete
+- [x] 9. Checkpoint - Core engine complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Implement tama-tauri backend
-  - [ ] 10.1 Set up Tauri IPC commands in `tama-tauri/src-tauri/src/commands.rs`
+- [x] 10. Implement tama-tauri backend
+  - [x] 10.1 Set up Tauri IPC commands in `tama-tauri/src-tauri/src/commands.rs`
     - Expose tama-core actions as Tauri commands: `get_state`, `feed_meal`, `feed_snack`, `play_game`, `discipline`, `give_medicine`, `clean_poop`, `toggle_lights`
     - Each command acquires shared state via Tauri managed state (Arc Mutex PetState), calls tama-core, saves, returns snapshot
     - Add `hatch_new_egg` command for restarting after death
     - Add `get_permissions` and `update_permissions` commands for agent permission management
     - _Requirements: 3.1-3.13, 8.5, 8.6_
 
-  - [ ] 10.2 Implement background tick loop and system tray in `tama-tauri/src-tauri/src/main.rs`
+  - [x] 10.2 Implement background tick loop and system tray in `tama-tauri/src-tauri/src/main.rs`
     - Spawn tokio task that calls `engine::tick()` every 60 seconds on the shared state
     - Configure system tray with icon, tooltip showing pet name/stage
     - Tray menu: Show Window, Pet Status summary, Quit
@@ -250,73 +250,73 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - On tray double-click: restore and focus window
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-  - [ ] 10.3 Implement desktop notifications in tama-tauri
+  - [x] 10.3 Implement desktop notifications in tama-tauri
     - Use `tauri-plugin-notification` to send alerts when hunger or happiness reaches 0
     - Send notification on evolution events and death
     - _Requirements: 10.5_
 
-  - [ ] 10.4 Implement TCP socket server for MCP bridge in `tama-tauri/src-tauri/src/socket.rs`
+  - [x] 10.4 Implement TCP socket server for MCP bridge in `tama-tauri/src-tauri/src/socket.rs`
     - Bind to `127.0.0.1` with random available port
     - Accept JSON requests from MCP sidecar, check permissions via `permissions::check_permission`, execute action, return JSON response
     - Write port number to `~/.tama96/mcp_port` for sidecar discovery
     - _Requirements: 9.3, 9.4, 9.5, 9.6_
 
-  - [ ] 10.5 Implement MCP sidecar lifecycle management in tama-tauri
+  - [x] 10.5 Implement MCP sidecar lifecycle management in tama-tauri
     - On app start: spawn `mcp-server` as Tauri sidecar process
     - Monitor sidecar health; on unexpected exit, restart with exponential backoff (2s, 4s, 8s, max 30s)
     - On app quit: terminate sidecar
     - _Requirements: 13.1, 13.2_
 
-  - [ ] 10.6 Wire up lockfile acquisition on startup in tama-tauri
+  - [x] 10.6 Wire up lockfile acquisition on startup in tama-tauri
     - Acquire lockfile at `~/.tama96/tama96.lock` on launch
     - If locked, show error dialog and exit
     - Release lockfile on quit via Drop guard
     - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 11. Implement React frontend for tama-tauri
-  - [ ] 11.1 Create `usePetState` hook and state polling in `tama-tauri/ui/src/hooks/usePetState.ts`
+- [x] 11. Implement React frontend for tama-tauri
+  - [x] 11.1 Create `usePetState` hook and state polling in `tama-tauri/ui/src/hooks/usePetState.ts`
     - Invoke `get_state` via Tauri IPC, poll every 1 second
     - Expose action functions: feedMeal, feedSnack, playGame, discipline, giveMedicine, cleanPoop, toggleLights
     - _Requirements: 11.1, 11.2, 11.3_
 
-  - [ ] 11.2 Build main pet display component
+  - [x] 11.2 Build main pet display component
     - Render pet sprite area with animation states (idle, eating, sleeping, happy, sick, dead)
     - Display hunger hearts (0-4), happiness hearts (0-4), discipline gauge (0-100), age, weight
     - Show poop indicators and sickness icon
     - _Requirements: 11.1, 11.2_
 
-  - [ ] 11.3 Build action button bar matching P1 icon layout
+  - [x] 11.3 Build action button bar matching P1 icon layout
     - Buttons: Feed (meal/snack submenu), Light, Game, Medicine, Bathroom, Meter, Discipline, Attention
     - Disable buttons based on state (e.g., no feed when dead, no medicine when not sick)
     - _Requirements: 11.3_
 
-  - [ ] 11.4 Build agent permissions settings panel
+  - [x] 11.4 Build agent permissions settings panel
     - Toggle master switch, per-action allow/deny toggles, rate limit inputs
     - Invoke `get_permissions` / `update_permissions` Tauri commands
     - _Requirements: 11.4, 8.5_
 
-  - [ ] 11.5 Build death screen and hatch-new-egg flow
+  - [x] 11.5 Build death screen and hatch-new-egg flow
     - Display death screen with final age and character
     - "Hatch New Egg" button invokes `hatch_new_egg` command
     - _Requirements: 11.5_
 
-- [ ] 12. Checkpoint - Desktop app functional
+- [x] 12. Checkpoint - Desktop app functional
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Implement tama-tui terminal app
-  - [ ] 13.1 Set up ratatui app skeleton in `tama-tui/src/main.rs`
+- [x] 13. Implement tama-tui terminal app
+  - [x] 13.1 Set up ratatui app skeleton in `tama-tui/src/main.rs`
     - Initialize crossterm backend, acquire lockfile, load state with catch-up
     - Set up main event loop: keyboard input + 60-second tick timer
     - On exit: save state, release lockfile, restore terminal
     - _Requirements: 12.4, 12.5, 12.6_
 
-  - [ ] 13.2 Implement braille sprite rendering in `tama-tui/src/sprites.rs`
+  - [x] 13.2 Implement braille sprite rendering in `tama-tui/src/sprites.rs`
     - Define 32x16 pixel grids for each Character and animation state
     - Convert pixel grids to braille characters (2x4 pixel blocks per braille cell)
     - Render into ratatui canvas widget
     - _Requirements: 12.1_
 
-  - [ ] 13.3 Build TUI layout with meters and status display
+  - [x] 13.3 Build TUI layout with meters and status display
     - Hunger hearts row (unicode filled/empty hearts)
     - Happiness hearts row
     - Discipline gauge bar
@@ -324,60 +324,60 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - Poop indicators, sickness icon, sleep indicator
     - _Requirements: 12.2_
 
-  - [ ] 13.4 Implement keyboard input handling
+  - [x] 13.4 Implement keyboard input handling
     - Map keys: f=feed (then m/s for meal/snack), g=game, d=discipline, c=clean, l=lights, i=medicine, q=quit
     - Dispatch to tama-core actions, save state after each action
     - _Requirements: 12.3_
 
-- [ ] 14. Implement MCP server (Node.js sidecar)
-  - [ ] 14.1 Implement TCP bridge client in `mcp-server/src/bridge.ts`
+- [x] 14. Implement MCP server (Node.js sidecar)
+  - [x] 14.1 Implement TCP bridge client in `mcp-server/src/bridge.ts`
     - Read port from `~/.tama96/mcp_port`
     - Connect to Tauri TCP socket, send JSON requests, receive JSON responses
     - Handle connection errors with retry logic
     - _Requirements: 9.6, 13.4_
 
-  - [ ] 14.2 Register MCP tools in `mcp-server/src/tools.ts`
+  - [x] 14.2 Register MCP tools in `mcp-server/src/tools.ts`
     - Tools: `feed` (type: meal|snack), `play_game` (moves array), `discipline`, `give_medicine`, `clean_poop`, `toggle_lights`, `get_status`
     - Each tool calls bridge, returns state snapshot or structured error
     - _Requirements: 9.1, 9.3, 9.4, 9.5_
 
-  - [ ] 14.3 Register MCP resources in `mcp-server/src/resources.ts`
+  - [x] 14.3 Register MCP resources in `mcp-server/src/resources.ts`
     - `pet://status`: current pet state summary
     - `pet://evolution-chart`: P1 evolution branching matrix
     - `pet://permissions`: current agent permission configuration
     - _Requirements: 9.2, 8.6_
 
-  - [ ] 14.4 Wire up MCP server entry point in `mcp-server/src/index.ts`
+  - [x] 14.4 Wire up MCP server entry point in `mcp-server/src/index.ts`
     - Create McpServer with stdio transport
     - Register tools and resources
     - Initialize bridge connection
     - _Requirements: 9.1, 13.3_
 
-- [ ] 15. Integration wiring and final polish
-  - [ ] 15.1 Wire tama-core module exports in `tama-core/src/lib.rs`
+- [x] 15. Integration wiring and final polish
+  - [x] 15.1 Wire tama-core module exports in `tama-core/src/lib.rs`
     - Re-export all public modules: state, engine, evolution, actions, characters, persistence, permissions
     - Ensure tama-tauri and tama-tui both depend on tama-core in their Cargo.toml
     - _Requirements: All (integration)_
 
-  - [ ] 15.2 Create `~/.tama96/` directory initialization utility
+  - [x] 15.2 Create `~/.tama96/` directory initialization utility
     - On first run from either frontend, create `~/.tama96/` if it doesn't exist
     - Initialize default `permissions.json` if missing
     - _Requirements: 6.1, 8.5_
 
-  - [ ] 15.3 Write integration tests for Tauri IPC round-trip
+  - [x] 15.3 Write integration tests for Tauri IPC round-trip
     - Invoke command, verify state change, verify response matches expected state
     - _Requirements: 3.1-3.13, 9.3, 9.4_
 
-  - [ ] 15.4 Write integration tests for MCP tool call flow
+  - [x] 15.4 Write integration tests for MCP tool call flow
     - MCP tool call to TCP bridge to permission check to action to state change to response
     - Test permission denied flow returns structured error
     - _Requirements: 9.1-9.6, 8.1-8.3_
 
-  - [ ] 15.5 Write integration test for lockfile exclusion
+  - [x] 15.5 Write integration test for lockfile exclusion
     - Acquire lock from one process, attempt from second, verify AlreadyLocked error
     - _Requirements: 7.1-7.4_
 
-- [ ] 16. Final checkpoint - All components integrated
+- [x] 16. Final checkpoint - All components integrated
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
