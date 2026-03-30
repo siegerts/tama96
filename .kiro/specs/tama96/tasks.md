@@ -58,53 +58,53 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - For any PetState produced by actions/ticks, assert Character variant is valid for current LifeStage and teen_type is Some only when stage is Teen, Adult, or Special
     - **Validates: Requirements 1.6, 1.7**
 
-- [ ] 3. Implement player actions in tama-core
-  - [ ] 3.1 Implement `feed_meal` and `feed_snack` in `tama-core/src/actions.rs`
+- [x] 3. Implement player actions in tama-core
+  - [x] 3.1 Implement `feed_meal` and `feed_snack` in `tama-core/src/actions.rs`
     - `feed_meal`: check preconditions (alive, awake, not sick), increment hunger (cap 4), increment weight
     - `feed_snack`: check preconditions (alive, awake), increment happiness (cap 4), add weight +2, increment snack counter, trigger sickness if baby + snack_count > 3
     - _Requirements: 3.1, 3.2, 3.3, 3.11_
 
-  - [ ] 3.2 Write property test: Feed meal correctness
+  - [x] 3.2 Write property test: Feed meal correctness
     - **Property 7: Feed meal correctness**
     - For any alive, awake, non-sick Pet, feeding a meal sets hunger to min(old+1, 4) and weight to old+1
     - **Validates: Requirements 3.1, 3.11**
 
-  - [ ] 3.3 Write property test: Feed snack correctness
+  - [x] 3.3 Write property test: Feed snack correctness
     - **Property 8: Feed snack correctness**
     - For any alive, awake Pet, feeding a snack sets happiness to min(old+1, 4) and weight to old+2
     - **Validates: Requirement 3.2**
 
-  - [ ] 3.4 Implement `play_game` in `tama-core/src/actions.rs`
+  - [x] 3.4 Implement `play_game` in `tama-core/src/actions.rs`
     - Check preconditions (alive, awake, not sick), generate 5 random pet choices, compare with player moves, if wins >= 3 increment happiness (cap 4), always decrement weight (floor 1)
     - _Requirements: 3.4, 3.5_
 
-  - [ ] 3.5 Write property test: Game outcome correctness
+  - [x] 3.5 Write property test: Game outcome correctness
     - **Property 9: Game outcome correctness**
     - For any game with 5 moves, wins >= 3 means happiness +1 (cap 4), weight always -1 (floor 1)
     - **Validates: Requirements 3.4, 3.5**
 
-  - [ ] 3.6 Implement `discipline` in `tama-core/src/actions.rs`
+  - [x] 3.6 Implement `discipline` in `tama-core/src/actions.rs`
     - Check pending_discipline_deadline exists, increment discipline by 25 (cap 100), clear deadline
     - Return NoDisciplineCallPending error if no pending call
     - _Requirements: 3.6, 3.7_
 
-  - [ ] 3.7 Write property test: Discipline action correctness
+  - [x] 3.7 Write property test: Discipline action correctness
     - **Property 10: Discipline action correctness**
     - With pending call: discipline += 25 (cap 100), deadline cleared. Without: NoDisciplineCallPending error
     - **Validates: Requirements 3.6, 3.7**
 
-  - [ ] 3.8 Implement `give_medicine`, `clean_poop`, `toggle_lights` in `tama-core/src/actions.rs`
+  - [x] 3.8 Implement `give_medicine`, `clean_poop`, `toggle_lights` in `tama-core/src/actions.rs`
     - `give_medicine`: check is_sick, increment sick_dose_count, cure at 2 doses
     - `clean_poop`: check poop_count > 0, decrement by 1
     - `toggle_lights`: flip lights_on, if turning off during sleep time set is_sleeping = true, clear pending_lights_deadline
     - _Requirements: 3.8, 3.9, 3.10_
 
-  - [ ] 3.9 Write property test: Medicine curing
+  - [x] 3.9 Write property test: Medicine curing
     - **Property 11: Medicine curing**
     - For any sick Pet, two doses of medicine set is_sick to false and sick_dose_count to 0
     - **Validates: Requirement 3.8**
 
-  - [ ] 3.10 Write property test: Action precondition enforcement
+  - [x] 3.10 Write property test: Action precondition enforcement
     - **Property 12: Action precondition enforcement**
     - Dead pet + any action returns PetIsDead error. Sleeping pet + feed_meal/play_game returns error
     - **Validates: Requirements 3.12, 3.13**

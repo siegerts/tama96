@@ -1,5 +1,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
+use tama_core::actions;
+use tama_core::actions::Choice;
 use tama_core::state::*;
 
 // ── Arbitrary generators ────────────────────────────────────────────────────
@@ -235,5 +237,316 @@ proptest! {
                 );
             }
         }
+    }
+}
+
+
+// ── Property 7: Feed meal correctness ───────────────────────────────────────
+// **Validates: Requirements 3.1, 3.11**
+
+proptest! {
+    #[test]
+    fn prop_feed_meal_correctness(mut state in arb_valid_pet_state()) {
+        // Only test on alive, awake, non-sick pets (feed_meal preconditions)
+        prop_assume!(state.is_alive && !state.is_sleeping && !state.is_sick);
+
+        let old_hunger = state.hunger;
+        let old_weight = state.weight;
+
+        let result = actions::feed_meal(&mut state);
+        prop_assert!(result.is_ok(), "feed_meal should succeed for alive, awake, non-sick pet");
+
+        // Requirement 3.1: hunger = min(old + 1, 4)
+        let expected_hunger = (old_hunger + 1).min(4);
+        prop_assert_eq!(
+            state.hunger, expected_hunger,
+            "hunger should be min(old_hunger + 1, 4) = min({} + 1, 4) = {}, got {}",
+            old_hunger, expected_hunger, state.hunger
+        );
+
+        // Requirement 3.11: weight = old + 1 (even when hunger is already at 4)
+        let expected_weight = old_weight + 1;
+        prop_assert_eq!(
+            state.weight, expected_weight,
+            "weight should be old_weight + 1 = {} + 1 = {}, got {}",
+            old_weight, expected_weight, state.weight
+        );
+    }
+}
+
+
+// ── Property 8: Feed snack correctness ──────────────────────────────────────
+// **Validates: Requirement 3.2**
+
+proptest! {
+    #[test]
+    fn prop_feed_snack_correctness(mut state in arb_valid_pet_state()) {
+        // Only test on alive, awake pets (feed_snack preconditions — no sick check needed)
+        prop_assume!(state.is_alive && !state.is_sleeping);
+
+        let old_happiness = state.happiness;
+        let old_weight = state.weight;
+
+        let result = actions::feed_snack(&mut state);
+        prop_assert!(result.is_ok(), "feed_snack should succeed for alive, awake pet");
+
+        // Requirement 3.2: happiness = min(old + 1, 4)
+        let expected_happiness = (old_happiness + 1).min(4);
+        prop_assert_eq!(
+            state.happiness, expected_happiness,
+            "happiness should be min(old_happiness + 1, 4) = min({} + 1, 4) = {}, got {}",
+            old_happiness, expected_happiness, state.happiness
+        );
+
+        // Weight = old + 2
+        let expected_weight = old_weight + 2;
+        prop_assert_eq!(
+            state.weight, expected_weight,
+            "weight should be old_weight + 2 = {} + 2 = {}, got {}",
+            old_weight, expected_weight, state.weight
+        );
+    }
+}
+
+
+// ── Choice generator ────────────────────────────────────────────────────────
+
+fn arb_choice() -> impl Strategy<Value = Choice> {
+    prop_oneof![Just(Choice::Left), Just(Choice::Right)]
+}
+
+
+// ── Property 9: Game outcome correctness ────────────────────────────────────
+// **Validates: Requirements 3.4, 3.5**
+
+proptest! {
+    #[test]
+    fn prop_game_outcome_correctness(
+        mut state in arb_valid_pet_state(),
+        m0 in arb_choice(),
+        m1 in arb_choice(),
+        m2 in arb_choice(),
+        m3 in arb_choice(),
+        m4 in arb_choice(),
+    ) {
+        // Filter to alive, awake, non-sick pets (play_game preconditions)
+        prop_assume!(state.is_alive && !state.is_sleeping && !state.is_sick);
+
+        let old_happiness = state.happiness;
+        let old_weight = state.weight;
+        let moves = [m0, m1, m2, m3, m4];
+
+        let result = actions::play_game(&mut state, moves);
+        prop_assert!(result.is_ok(), "play_game should succeed for alive, awake, non-sick pet");
+        let game = result.unwrap();
+
+        // 1. Always 5 rounds
+        prop_assert_eq!(game.rounds, 5, "rounds should always be 5, got {}", game.rounds);
+
+        // 2. Wins in [0, 5]
+        prop_assert!(game.wins <= 5, "wins {} should be in [0, 5]", game.wins);
+
+        // 3. Requirement 3.4: If wins >= 3, happiness = min(old + 1, 4)
+        if game.wins >= 3 {
+            let expected_happiness = (old_happiness + 1).min(4);
+            prop_assert_eq!(
+                state.happiness, expected_happiness,
+                "wins >= 3: happiness should be min({} + 1, 4) = {}, got {}",
+                old_happiness, expected_happiness, state.happiness
+            );
+            // happiness_gained should reflect the actual increase
+            let expected_gained = expected_happiness - old_happiness;
+            prop_assert_eq!(
+                game.happiness_gained, expected_gained,
+                "happiness_gained should be {}, got {}",
+                expected_gained, game.happiness_gained
+            );
+        } else {
+            // Happiness unchanged when wins < 3
+            prop_assert_eq!(
+                state.happiness, old_happiness,
+                "wins < 3: happiness should remain {}, got {}",
+                old_happiness, state.happiness
+            );
+            prop_assert_eq!(
+                game.happiness_gained, 0,
+                "wins < 3: happiness_gained should be 0, got {}",
+                game.happiness_gained
+            );
+        }
+
+        // 4. Requirement 3.5: Weight always decreases by 1, floored at 1
+        let expected_weight = old_weight.saturating_sub(1).max(1);
+        prop_assert_eq!(
+            state.weight, expected_weight,
+            "weight should be max({} - 1, 1) = {}, got {}",
+            old_weight, expected_weight, state.weight
+        );
+    }
+}
+
+
+// ── Property 10: Discipline action correctness ──────────────────────────────
+// **Validates: Requirements 3.6, 3.7**
+
+proptest! {
+    #[test]
+    fn prop_discipline_with_pending_call(mut state in arb_valid_pet_state(), deadline in arb_datetime()) {
+        // Filter to alive pets only
+        prop_assume!(state.is_alive);
+
+        // Set up precondition: pending discipline call exists
+        state.pending_discipline_deadline = Some(deadline);
+        let old_discipline = state.discipline;
+
+        let result = actions::discipline(&mut state);
+        prop_assert!(result.is_ok(), "discipline should succeed when pending call exists");
+        prop_assert_eq!(result.unwrap(), actions::ActionResult::Disciplined);
+
+        // Requirement 3.6: discipline = min(old + 25, 100)
+        let expected_discipline = (old_discipline + 25).min(100);
+        prop_assert_eq!(
+            state.discipline, expected_discipline,
+            "discipline should be min({} + 25, 100) = {}, got {}",
+            old_discipline, expected_discipline, state.discipline
+        );
+
+        // Requirement 3.6: pending deadline cleared
+        prop_assert!(
+            state.pending_discipline_deadline.is_none(),
+            "pending_discipline_deadline should be None after discipline, got {:?}",
+            state.pending_discipline_deadline
+        );
+    }
+
+    #[test]
+    fn prop_discipline_without_pending_call(mut state in arb_valid_pet_state()) {
+        // Filter to alive pets only
+        prop_assume!(state.is_alive);
+
+        // Set up precondition: no pending discipline call
+        state.pending_discipline_deadline = None;
+
+        let result = actions::discipline(&mut state);
+
+        // Requirement 3.7: returns NoDisciplineCallPending error
+        prop_assert!(result.is_err(), "discipline should fail when no pending call");
+        prop_assert_eq!(
+            result.unwrap_err(),
+            actions::ActionError::NoDisciplineCallPending,
+            "should return NoDisciplineCallPending error"
+        );
+    }
+}
+
+
+// ── Property 11: Medicine curing ────────────────────────────────────────────
+// **Validates: Requirement 3.8**
+
+proptest! {
+    #[test]
+    fn prop_medicine_curing(mut state in arb_valid_pet_state()) {
+        // Filter to alive pets and force sick state with 0 doses to test full two-dose cycle
+        prop_assume!(state.is_alive);
+        state.is_sick = true;
+        state.sick_dose_count = 0;
+
+        // First dose
+        let result1 = actions::give_medicine(&mut state);
+        prop_assert!(result1.is_ok(), "first give_medicine should succeed for alive, sick pet");
+        prop_assert!(state.is_sick, "pet should still be sick after first dose");
+        prop_assert_eq!(
+            state.sick_dose_count, 1,
+            "sick_dose_count should be 1 after first dose, got {}",
+            state.sick_dose_count
+        );
+
+        // Second dose
+        let result2 = actions::give_medicine(&mut state);
+        prop_assert!(result2.is_ok(), "second give_medicine should succeed for alive, sick pet");
+        prop_assert!(
+            !state.is_sick,
+            "pet should not be sick after second dose"
+        );
+        prop_assert_eq!(
+            state.sick_dose_count, 0,
+            "sick_dose_count should be 0 after cure, got {}",
+            state.sick_dose_count
+        );
+    }
+}
+
+
+// ── Property 12: Action precondition enforcement ────────────────────────────
+// **Validates: Requirements 3.12, 3.13**
+
+proptest! {
+    /// Case 1: Dead pet returns PetIsDead for all actions.
+    #[test]
+    fn prop_dead_pet_returns_pet_is_dead(mut state in arb_valid_pet_state()) {
+        // Force dead state
+        state.is_alive = false;
+        state.stage = LifeStage::Dead;
+
+        let now = Utc::now();
+        let dummy_moves = [Choice::Left, Choice::Left, Choice::Left, Choice::Left, Choice::Left];
+
+        // Every action must return Err(ActionError::PetIsDead)
+        prop_assert_eq!(
+            actions::feed_meal(&mut state),
+            Err(actions::ActionError::PetIsDead),
+            "feed_meal should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::feed_snack(&mut state),
+            Err(actions::ActionError::PetIsDead),
+            "feed_snack should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::play_game(&mut state, dummy_moves),
+            Err(actions::ActionError::PetIsDead),
+            "play_game should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::discipline(&mut state),
+            Err(actions::ActionError::PetIsDead),
+            "discipline should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::give_medicine(&mut state),
+            Err(actions::ActionError::PetIsDead),
+            "give_medicine should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::clean_poop(&mut state),
+            Err(actions::ActionError::PetIsDead),
+            "clean_poop should return PetIsDead for dead pet"
+        );
+        prop_assert_eq!(
+            actions::toggle_lights(&mut state, now),
+            Err(actions::ActionError::PetIsDead),
+            "toggle_lights should return PetIsDead for dead pet"
+        );
+    }
+
+    /// Case 2: Sleeping pet returns PetIsSleeping for feed_meal and play_game.
+    #[test]
+    fn prop_sleeping_pet_returns_pet_is_sleeping(mut state in arb_valid_pet_state()) {
+        // Filter to alive pets, then force sleeping
+        prop_assume!(state.is_alive);
+        state.is_sleeping = true;
+
+        let dummy_moves = [Choice::Left, Choice::Left, Choice::Left, Choice::Left, Choice::Left];
+
+        prop_assert_eq!(
+            actions::feed_meal(&mut state),
+            Err(actions::ActionError::PetIsSleeping),
+            "feed_meal should return PetIsSleeping for sleeping pet"
+        );
+        prop_assert_eq!(
+            actions::play_game(&mut state, dummy_moves),
+            Err(actions::ActionError::PetIsSleeping),
+            "play_game should return PetIsSleeping for sleeping pet"
+        );
     }
 }
