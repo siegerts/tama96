@@ -1,0 +1,117 @@
+use crate::state::Character;
+
+pub struct CharacterStats {
+    pub sleep_hour: u8,
+    pub wake_hour: u8,
+    pub hunger_decay_minutes: u16,
+    pub happy_decay_minutes: u16,
+    pub base_weight: u8,
+    pub max_lifespan_days: u16,
+    pub poop_interval_minutes: u16,
+}
+
+impl CharacterStats {
+    pub fn for_character(c: &Character) -> Self {
+        match c {
+            Character::Babytchi => CharacterStats {
+                sleep_hour: 20,
+                wake_hour: 8,
+                hunger_decay_minutes: 30,
+                happy_decay_minutes: 30,
+                base_weight: 5,
+                max_lifespan_days: 0,
+                poop_interval_minutes: 60,
+            },
+            Character::Marutchi => CharacterStats {
+                sleep_hour: 20,
+                wake_hour: 9,
+                hunger_decay_minutes: 20,
+                happy_decay_minutes: 25,
+                base_weight: 10,
+                max_lifespan_days: 0,
+                poop_interval_minutes: 45,
+            },
+            Character::Tamatchi => CharacterStats {
+                sleep_hour: 21,
+                wake_hour: 9,
+                hunger_decay_minutes: 18,
+                happy_decay_minutes: 22,
+                base_weight: 15,
+                max_lifespan_days: 0,
+                poop_interval_minutes: 40,
+            },
+            Character::Kuchitamatchi => CharacterStats {
+                sleep_hour: 21,
+                wake_hour: 9,
+                hunger_decay_minutes: 16,
+                happy_decay_minutes: 20,
+                base_weight: 20,
+                max_lifespan_days: 0,
+                poop_interval_minutes: 35,
+            },
+            Character::Mametchi => CharacterStats {
+                sleep_hour: 22,
+                wake_hour: 9,
+                hunger_decay_minutes: 12,
+                happy_decay_minutes: 15,
+                base_weight: 10,
+                max_lifespan_days: 16,
+                poop_interval_minutes: 30,
+            },
+            Character::Ginjirotchi => CharacterStats {
+                sleep_hour: 22,
+                wake_hour: 9,
+                hunger_decay_minutes: 14,
+                happy_decay_minutes: 17,
+                base_weight: 15,
+                max_lifespan_days: 12,
+                poop_interval_minutes: 35,
+            },
+            Character::Maskutchi => CharacterStats {
+                sleep_hour: 22,
+                wake_hour: 9,
+                hunger_decay_minutes: 10,
+                happy_decay_minutes: 12,
+                base_weight: 20,
+                max_lifespan_days: 16,
+                poop_interval_minutes: 25,
+            },
+            Character::Kuchipatchi => CharacterStats {
+                sleep_hour: 21,
+                wake_hour: 9,
+                hunger_decay_minutes: 8,
+                happy_decay_minutes: 10,
+                base_weight: 25,
+                max_lifespan_days: 6,
+                poop_interval_minutes: 20,
+            },
+            Character::Nyorotchi => CharacterStats {
+                sleep_hour: 21,
+                wake_hour: 9,
+                hunger_decay_minutes: 6,
+                happy_decay_minutes: 7,
+                base_weight: 15,
+                max_lifespan_days: 3,
+                poop_interval_minutes: 20,
+            },
+            Character::Tarakotchi => CharacterStats {
+                sleep_hour: 21,
+                wake_hour: 9,
+                hunger_decay_minutes: 7,
+                happy_decay_minutes: 8,
+                base_weight: 20,
+                max_lifespan_days: 4,
+                poop_interval_minutes: 20,
+            },
+            Character::Oyajitchi => CharacterStats {
+                sleep_hour: 22,
+                wake_hour: 9,
+                hunger_decay_minutes: 10,
+                happy_decay_minutes: 12,
+                base_weight: 20,
+                max_lifespan_days: 16,
+                poop_interval_minutes: 25,
+            },
+        }
+    }
+}

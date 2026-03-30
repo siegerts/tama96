@@ -1,0 +1,12 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for tama96",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "shell:default"
+  ]
+}
