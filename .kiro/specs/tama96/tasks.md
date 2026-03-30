@@ -109,26 +109,26 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - Dead pet + any action returns PetIsDead error. Sleeping pet + feed_meal/play_game returns error
     - **Validates: Requirements 3.12, 3.13**
 
-- [ ] 4. Checkpoint - Core actions
+- [x] 4. Checkpoint - Core actions
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement tick engine in tama-core
-  - [ ] 5.1 Implement heart decay in `tama-core/src/engine.rs`
+- [x] 5. Implement tick engine in tama-core
+  - [x] 5.1 Implement heart decay in `tama-core/src/engine.rs`
     - `decay_hearts(state, stats, elapsed_minutes)`: decrement hunger/happiness by floor(elapsed / decay_rate), clamp to 0
     - Start 15-minute care deadline when a meter hits 0 (if no deadline pending)
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [ ] 5.2 Write property test: Heart decay correctness
+  - [x] 5.2 Write property test: Heart decay correctness
     - **Property 3: Heart decay correctness**
     - For any awake, alive Pet with known Character and elapsed time, hunger decrements by floor(elapsed / hunger_decay_minutes) and happiness by floor(elapsed / happy_decay_minutes), each clamped to 0
     - **Validates: Requirements 2.1, 2.2**
 
-  - [ ] 5.3 Write property test: Care deadline lifecycle
+  - [x] 5.3 Write property test: Care deadline lifecycle
     - **Property 4: Care deadline lifecycle**
     - When hunger or happiness reaches 0, a 15-minute deadline is created if none exists. When deadline expires, care_mistakes increments by 1
     - **Validates: Requirements 2.3, 2.4**
 
-  - [ ] 5.4 Implement poop, sickness, discipline call, and sleep checks in `tama-core/src/engine.rs`
+  - [x] 5.4 Implement poop, sickness, discipline call, and sleep checks in `tama-core/src/engine.rs`
     - `check_poop`: accumulate poop based on character poop_interval_minutes
     - `check_sickness`: trigger sickness from poop threshold or snack overfeeding
     - `maybe_generate_discipline_call`: random false attention calls with 15-minute deadline
@@ -136,27 +136,27 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - `check_sleep` / `check_wake`: manage sleep/wake transitions based on character sleep/wake hours, age increment on wake
     - _Requirements: 2.5, 2.6_
 
-  - [ ] 5.5 Write property test: Sleep immunity
+  - [x] 5.5 Write property test: Sleep immunity
     - **Property 5: Sleep immunity**
     - For any sleeping Pet, a tick shall not change hunger or happiness values
     - **Validates: Requirement 2.6**
 
-  - [ ] 5.6 Implement death checks in `tama-core/src/engine.rs`
+  - [x] 5.6 Implement death checks in `tama-core/src/engine.rs`
     - `check_death`: old age (age >= max_lifespan_days), neglect (hunger + happiness == 0 for 12h), untreated sickness (24h), baby snack overfeeding (snack_count > 5)
     - `kill(state)`: set is_alive = false, stage = Dead
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 5.7 Write property test: Dead pets don't tick
+  - [x] 5.7 Write property test: Dead pets don't tick
     - **Property 6: Dead pets don't tick**
     - For any dead Pet, a tick leaves the entire PetState unchanged
     - **Validates: Requirement 2.7**
 
-  - [ ] 5.8 Write property test: Death from old age
+  - [x] 5.8 Write property test: Death from old age
     - **Property 20: Death from old age**
     - For any Character with max_lifespan_days > 0, when age reaches that value, is_alive becomes false and stage becomes Dead
     - **Validates: Requirement 5.1**
 
-  - [ ] 5.9 Implement main `tick()` function in `tama-core/src/engine.rs`
+  - [x] 5.9 Implement main `tick()` function in `tama-core/src/engine.rs`
     - Orchestrate: egg hatch check, sleep skip, decay, care deadlines, poop, sickness, discipline, sleep, death, evolution, update last_tick
     - Handle egg stage separately (only check hatch timer)
     - _Requirements: 2.1-2.8_

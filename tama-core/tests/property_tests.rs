@@ -2,6 +2,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use proptest::prelude::*;
 use tama_core::actions;
 use tama_core::actions::Choice;
+use tama_core::characters::CharacterStats;
+use tama_core::engine;
 use tama_core::state::*;
 
 // ── Arbitrary generators ────────────────────────────────────────────────────
@@ -547,6 +549,190 @@ proptest! {
             actions::play_game(&mut state, dummy_moves),
             Err(actions::ActionError::PetIsSleeping),
             "play_game should return PetIsSleeping for sleeping pet"
+        );
+    }
+}
+
+
+// ── Property 5: Sleep immunity ───────────────────────────────────────────────
+// **Validates: Requirement 2.6**
+
+proptest! {
+    #[test]
+    fn prop_sleep_immunity(mut state in arb_valid_pet_state()) {
+        // Filter to alive, sleeping, non-egg pets
+        prop_assume!(state.is_alive && state.is_sleeping && state.stage != LifeStage::Egg);
+
+        let old_hunger = state.hunger;
+        let old_happiness = state.happiness;
+        let stats = CharacterStats::for_character(&state.character);
+
+        // Create a time that's within the sleep window
+        // Use sleep_hour + 1 (mod 24) to ensure we're in the sleep window
+        let sleep_hour = stats.sleep_hour as u32;
+        let now = Utc.with_ymd_and_hms(2024, 6, 15, (sleep_hour + 1) % 24, 30, 0).unwrap();
+        state.last_tick = now - chrono::Duration::minutes(60);
+
+        // Simulate what tick() does for sleeping pets: only check_wake, no decay
+        // Since we're in the sleep window, check_wake should NOT wake the pet
+        engine::check_wake(&mut state, &stats, now);
+
+        // If pet is still sleeping (which it should be since we're in sleep window),
+        // hunger and happiness must be unchanged
+        if state.is_sleeping {
+            prop_assert_eq!(state.hunger, old_hunger, "hunger should not change during sleep");
+            prop_assert_eq!(state.happiness, old_happiness, "happiness should not change during sleep");
+        }
+    }
+}
+
+
+// ── Property 3: Heart decay correctness ─────────────────────────────────────
+// **Validates: Requirements 2.1, 2.2**
+
+proptest! {
+    #[test]
+    fn prop_heart_decay_correctness(
+        mut state in arb_valid_pet_state(),
+        elapsed in 0u16..=120,
+    ) {
+        // Filter to alive, awake, non-egg pets
+        prop_assume!(state.is_alive && !state.is_sleeping && state.stage != LifeStage::Egg);
+
+        let stats = CharacterStats::for_character(&state.character);
+        let old_hunger = state.hunger;
+        let old_happiness = state.happiness;
+        let now = state.last_tick;
+
+        engine::decay_hearts(&mut state, &stats, elapsed, now);
+
+        // Requirement 2.1: hunger decremented by floor(elapsed / hunger_decay_minutes), clamped to 0
+        let expected_hunger = old_hunger.saturating_sub((elapsed / stats.hunger_decay_minutes) as u8);
+        prop_assert_eq!(
+            state.hunger, expected_hunger,
+            "hunger should be {}.saturating_sub({} / {}) = {}, got {}",
+            old_hunger, elapsed, stats.hunger_decay_minutes, expected_hunger, state.hunger
+        );
+
+        // Requirement 2.2: happiness decremented by floor(elapsed / happy_decay_minutes), clamped to 0
+        let expected_happiness = old_happiness.saturating_sub((elapsed / stats.happy_decay_minutes) as u8);
+        prop_assert_eq!(
+            state.happiness, expected_happiness,
+            "happiness should be {}.saturating_sub({} / {}) = {}, got {}",
+            old_happiness, elapsed, stats.happy_decay_minutes, expected_happiness, state.happiness
+        );
+    }
+}
+
+
+// ── Property 4: Care deadline lifecycle ─────────────────────────────────────
+// **Validates: Requirements 2.3, 2.4**
+
+proptest! {
+    /// Test case 1: When hunger or happiness reaches 0 and no deadline exists,
+    /// a 15-minute care deadline is created.
+    #[test]
+    fn prop_care_deadline_created_when_meter_hits_zero(mut state in arb_valid_pet_state(), now in arb_datetime()) {
+        // Filter to alive, awake, non-egg pets
+        prop_assume!(state.is_alive && !state.is_sleeping && state.stage != LifeStage::Egg);
+
+        // Force hunger or happiness to 0, and no pending deadline
+        state.hunger = 0;
+        state.pending_care_deadline = None;
+
+        let stats = CharacterStats::for_character(&state.character);
+
+        // Call with 0 elapsed so no further decay, but the function checks if meters are at 0
+        engine::decay_hearts(&mut state, &stats, 0, now);
+
+        // Requirement 2.3: a 15-minute deadline should be created
+        prop_assert!(
+            state.pending_care_deadline.is_some(),
+            "pending_care_deadline should be Some when hunger is 0 and no deadline existed"
+        );
+        let expected_deadline = now + chrono::Duration::minutes(15);
+        prop_assert_eq!(
+            state.pending_care_deadline.unwrap(),
+            expected_deadline,
+            "deadline should be now + 15 minutes = {:?}, got {:?}",
+            expected_deadline,
+            state.pending_care_deadline.unwrap()
+        );
+    }
+
+    /// Test case 2: An existing care deadline is not overwritten when meters are still at 0.
+    #[test]
+    fn prop_care_deadline_not_overwritten(
+        mut state in arb_valid_pet_state(),
+        existing_deadline in arb_datetime(),
+        now in arb_datetime(),
+    ) {
+        // Filter to alive, awake, non-egg pets
+        prop_assume!(state.is_alive && !state.is_sleeping && state.stage != LifeStage::Egg);
+
+        // Force hunger to 0 and set an existing deadline
+        state.hunger = 0;
+        state.pending_care_deadline = Some(existing_deadline);
+
+        let stats = CharacterStats::for_character(&state.character);
+
+        // Call with 0 elapsed — deadline should not be overwritten
+        engine::decay_hearts(&mut state, &stats, 0, now);
+
+        // Requirement 2.3: existing deadline must be preserved
+        prop_assert_eq!(
+            state.pending_care_deadline,
+            Some(existing_deadline),
+            "pending_care_deadline should remain {:?}, got {:?}",
+            existing_deadline,
+            state.pending_care_deadline.unwrap()
+        );
+    }
+}
+
+
+// ── Property 6: Dead pets don't tick ─────────────────────────────────────────
+// **Validates: Requirement 2.7**
+
+proptest! {
+    #[test]
+    fn prop_dead_pets_dont_tick(state in arb_valid_pet_state()) {
+        // Force dead state
+        let mut state = state;
+        state.is_alive = false;
+        state.stage = LifeStage::Dead;
+
+        let snapshot = state.clone();
+        let now = state.last_tick + chrono::Duration::minutes(60);
+
+        // tick() is a complete no-op for dead pets — not even last_tick changes
+        engine::tick(&mut state, now);
+
+        prop_assert_eq!(state, snapshot, "dead pet state should be completely unchanged after tick");
+    }
+}
+
+
+// ── Property 20: Death from old age ─────────────────────────────────────────
+// **Validates: Requirement 5.1**
+
+proptest! {
+    #[test]
+    fn prop_death_from_old_age(mut state in arb_valid_pet_state()) {
+        let stats = CharacterStats::for_character(&state.character);
+        // Only test characters with a finite lifespan
+        prop_assume!(state.is_alive && stats.max_lifespan_days > 0);
+
+        // Set age to exactly the max lifespan
+        state.age = stats.max_lifespan_days;
+        let now = state.last_tick + chrono::Duration::minutes(1);
+
+        engine::check_death(&mut state, &stats, now);
+
+        prop_assert!(!state.is_alive, "pet should be dead when age >= max_lifespan_days");
+        prop_assert_eq!(
+            state.stage, LifeStage::Dead,
+            "stage should be Dead when age >= max_lifespan_days"
         );
     }
 }

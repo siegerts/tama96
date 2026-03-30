@@ -56,7 +56,7 @@ pub enum ActionType {
 
 // ── PetState ────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PetState {
     // Identity
     pub stage: LifeStage,
