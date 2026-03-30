@@ -161,25 +161,25 @@ Implement a faithful 1996 Tamagotchi P1 virtual pet as a Cargo workspace with fo
     - Handle egg stage separately (only check hatch timer)
     - _Requirements: 2.1-2.8_
 
-- [ ] 6. Implement evolution system in tama-core
-  - [ ] 6.1 Implement evolution logic in `tama-core/src/evolution.rs`
+- [x] 6. Implement evolution system in tama-core
+  - [x] 6.1 Implement evolution logic in `tama-core/src/evolution.rs`
     - `check_evolution(state, now)`: Egg to Baby (5min), Baby to Child (65min), Child to Teen (age 3), Teen to Adult (age 6), Adult to Special (Maskutchi T2 path, 4 days)
     - `resolve_teen(care_mistakes, discipline_mistakes)`: branch on care_mistakes <= 2 gives Tamatchi, else Kuchitamatchi; discipline_mistakes <= 2 gives Type1, else Type2
     - `resolve_adult(teen_char, teen_type, care_mistakes, discipline_mistakes)`: full P1 branching matrix from design
     - `evolve_to(state, stage, character, now)`: reset discipline, clear deadlines, update stage_start_time
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 6.2 Write property test: Evolution determinism
+  - [x] 6.2 Write property test: Evolution determinism
     - **Property 13: Evolution determinism**
     - For any two calls to resolve_adult with identical (teen_character, teen_type, care_mistakes, discipline_mistakes), the resulting adult Character is identical
     - **Validates: Requirements 4.3, 4.4, 4.7**
 
-  - [ ] 6.3 Write property test: Evolution reset postconditions
+  - [x] 6.3 Write property test: Evolution reset postconditions
     - **Property 14: Evolution reset postconditions**
     - For any evolution event, discipline is reset to 0 and pending care/discipline deadlines are cleared
     - **Validates: Requirement 4.6**
 
-  - [ ] 6.4 Write unit tests for all evolution paths
+  - [x] 6.4 Write unit tests for all evolution paths
     - Test each path: Egg to Baby, Baby to Child, Child to Tamatchi, Child to Kuchitamatchi, Teen to each of 6 adults, Maskutchi to Oyajitchi
     - Verify the full P1 branching matrix exhaustively
     - _Requirements: 4.1-4.7_

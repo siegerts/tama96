@@ -736,3 +736,617 @@ proptest! {
         );
     }
 }
+
+
+// ── Property 13: Evolution determinism ──────────────────────────────────────
+// **Validates: Requirements 4.3, 4.4, 4.7**
+
+proptest! {
+    #[test]
+    fn prop_evolution_determinism(
+        teen_char in prop_oneof![Just(Character::Tamatchi), Just(Character::Kuchitamatchi)],
+        teen_type in prop_oneof![Just(TeenType::Type1), Just(TeenType::Type2)],
+        care_mistakes in 0u8..=20,
+        discipline_mistakes in 0u8..=20,
+    ) {
+        let result1 = tama_core::evolution::resolve_adult(&teen_char, teen_type, care_mistakes, discipline_mistakes);
+        let result2 = tama_core::evolution::resolve_adult(&teen_char, teen_type, care_mistakes, discipline_mistakes);
+
+        prop_assert_eq!(
+            result1, result2,
+            "resolve_adult must be deterministic for ({:?}, {:?}, care={}, disc={})",
+            teen_char, teen_type, care_mistakes, discipline_mistakes
+        );
+    }
+}
+
+
+// ── Property 14: Evolution reset postconditions ─────────────────────────────
+// **Validates: Requirement 4.6**
+
+proptest! {
+    #[test]
+    fn prop_evolution_reset_postconditions(mut state in arb_valid_pet_state(), now in arb_datetime()) {
+        // Only test stages that can evolve (Baby, Child, Teen, Adult)
+        prop_assume!(state.is_alive);
+        prop_assume!(matches!(
+            state.stage,
+            LifeStage::Baby | LifeStage::Child | LifeStage::Teen | LifeStage::Adult
+        ));
+
+        // Set up conditions so evolution will trigger
+        match state.stage {
+            LifeStage::Baby => {
+                // Need 65 minutes elapsed in stage
+                state.stage_start_time = now - chrono::Duration::minutes(70);
+            }
+            LifeStage::Child => {
+                state.age = 3;
+            }
+            LifeStage::Teen => {
+                state.age = 6;
+                // Ensure teen_type is set
+                if state.teen_type.is_none() {
+                    state.teen_type = Some(TeenType::Type1);
+                }
+            }
+            LifeStage::Adult => {
+                // Maskutchi from T2 path, 4 days elapsed
+                state.character = Character::Maskutchi;
+                state.teen_type = Some(TeenType::Type2);
+                state.stage_start_time = now - chrono::Duration::days(5);
+            }
+            _ => {}
+        }
+
+        // Set non-zero discipline and pending deadlines to verify they get reset
+        state.discipline = 75;
+        state.pending_care_deadline = Some(now);
+        state.pending_discipline_deadline = Some(now);
+
+        let evolved = tama_core::evolution::check_evolution(&mut state, now);
+        prop_assert!(evolved, "evolution should have occurred for stage {:?}", state.stage);
+
+        // Requirement 4.6: discipline reset to 0
+        prop_assert_eq!(
+            state.discipline, 0,
+            "discipline should be 0 after evolution, got {}",
+            state.discipline
+        );
+
+        // Requirement 4.6: pending deadlines cleared
+        prop_assert!(
+            state.pending_care_deadline.is_none(),
+            "pending_care_deadline should be None after evolution, got {:?}",
+            state.pending_care_deadline
+        );
+        prop_assert!(
+            state.pending_discipline_deadline.is_none(),
+            "pending_discipline_deadline should be None after evolution, got {:?}",
+            state.pending_discipline_deadline
+        );
+
+        // stage_start_time should be updated to now
+        prop_assert_eq!(
+            state.stage_start_time, now,
+            "stage_start_time should be updated to now after evolution"
+        );
+    }
+}
+
+
+// ── Unit tests: Evolution paths ─────────────────────────────────────────────
+// **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7**
+
+#[cfg(test)]
+mod evolution_tests {
+    use super::*;
+    use chrono::{Duration, TimeZone};
+    use tama_core::evolution::*;
+
+    fn base_time() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap()
+    }
+
+    fn make_baby(now: DateTime<Utc>) -> PetState {
+        let mut s = PetState::new_egg(now);
+        s.stage = LifeStage::Baby;
+        s.character = Character::Babytchi;
+        s.stage_start_time = now;
+        s.is_alive = true;
+        s
+    }
+
+    fn make_child(now: DateTime<Utc>) -> PetState {
+        let mut s = make_baby(now);
+        s.stage = LifeStage::Child;
+        s.character = Character::Marutchi;
+        s.stage_start_time = now;
+        s
+    }
+
+    fn make_teen(now: DateTime<Utc>, character: Character, teen_type: TeenType) -> PetState {
+        let mut s = make_child(now);
+        s.stage = LifeStage::Teen;
+        s.character = character;
+        s.teen_type = Some(teen_type);
+        s.stage_start_time = now;
+        s
+    }
+
+    fn make_adult(now: DateTime<Utc>, character: Character, teen_type: TeenType) -> PetState {
+        let mut s = make_teen(now, Character::Tamatchi, teen_type);
+        s.stage = LifeStage::Adult;
+        s.character = character;
+        s.stage_start_time = now;
+        s
+    }
+
+    // ── Baby → Child (65 minutes) ──────────────────────────────────────
+
+    #[test]
+    fn baby_to_child_after_65_minutes() {
+        let now = base_time();
+        let mut state = make_baby(now);
+        state.discipline = 50;
+        state.pending_care_deadline = Some(now);
+        state.pending_discipline_deadline = Some(now);
+
+        let tick_time = now + Duration::minutes(65);
+        let evolved = check_evolution(&mut state, tick_time);
+
+        assert!(evolved);
+        assert_eq!(state.stage, LifeStage::Child);
+        assert_eq!(state.character, Character::Marutchi);
+        assert_eq!(state.discipline, 0);
+        assert!(state.pending_care_deadline.is_none());
+        assert!(state.pending_discipline_deadline.is_none());
+        assert_eq!(state.stage_start_time, tick_time);
+    }
+
+    #[test]
+    fn baby_no_evolution_before_65_minutes() {
+        let now = base_time();
+        let mut state = make_baby(now);
+        let tick_time = now + Duration::minutes(64);
+        assert!(!check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Baby);
+    }
+
+    // ── Child → Teen (resolve_teen) ────────────────────────────────────
+
+    #[test]
+    fn child_to_tamatchi_type1() {
+        let now = base_time();
+        let mut state = make_child(now);
+        state.age = 3;
+        state.care_mistakes = 0;
+        state.discipline_mistakes = 0;
+
+        assert!(check_evolution(&mut state, now));
+        assert_eq!(state.stage, LifeStage::Teen);
+        assert_eq!(state.character, Character::Tamatchi);
+        assert_eq!(state.teen_type, Some(TeenType::Type1));
+    }
+
+    #[test]
+    fn child_to_tamatchi_type2() {
+        let now = base_time();
+        let mut state = make_child(now);
+        state.age = 3;
+        state.care_mistakes = 2; // <= 2 → Tamatchi
+        state.discipline_mistakes = 3; // 3+ → Type2
+
+        assert!(check_evolution(&mut state, now));
+        assert_eq!(state.character, Character::Tamatchi);
+        assert_eq!(state.teen_type, Some(TeenType::Type2));
+    }
+
+    #[test]
+    fn child_to_kuchitamatchi_type1() {
+        let now = base_time();
+        let mut state = make_child(now);
+        state.age = 3;
+        state.care_mistakes = 3; // 3+ → Kuchitamatchi
+        state.discipline_mistakes = 2; // <= 2 → Type1
+
+        assert!(check_evolution(&mut state, now));
+        assert_eq!(state.character, Character::Kuchitamatchi);
+        assert_eq!(state.teen_type, Some(TeenType::Type1));
+    }
+
+    #[test]
+    fn child_to_kuchitamatchi_type2() {
+        let now = base_time();
+        let mut state = make_child(now);
+        state.age = 3;
+        state.care_mistakes = 5;
+        state.discipline_mistakes = 4;
+
+        assert!(check_evolution(&mut state, now));
+        assert_eq!(state.character, Character::Kuchitamatchi);
+        assert_eq!(state.teen_type, Some(TeenType::Type2));
+    }
+
+    #[test]
+    fn child_no_evolution_before_age_3() {
+        let now = base_time();
+        let mut state = make_child(now);
+        state.age = 2;
+        assert!(!check_evolution(&mut state, now));
+        assert_eq!(state.stage, LifeStage::Child);
+    }
+
+    // ── resolve_teen unit tests ────────────────────────────────────────
+
+    #[test]
+    fn resolve_teen_boundary_care_2() {
+        let (c, _) = resolve_teen(2, 0);
+        assert_eq!(c, Character::Tamatchi);
+    }
+
+    #[test]
+    fn resolve_teen_boundary_care_3() {
+        let (c, _) = resolve_teen(3, 0);
+        assert_eq!(c, Character::Kuchitamatchi);
+    }
+
+    #[test]
+    fn resolve_teen_boundary_disc_2() {
+        let (_, t) = resolve_teen(0, 2);
+        assert_eq!(t, TeenType::Type1);
+    }
+
+    #[test]
+    fn resolve_teen_boundary_disc_3() {
+        let (_, t) = resolve_teen(0, 3);
+        assert_eq!(t, TeenType::Type2);
+    }
+
+    // ── Teen → Adult (resolve_adult full P1 matrix) ────────────────────
+
+    // Tamatchi T1 paths
+    #[test]
+    fn tamatchi_t1_low_care_0_disc_mametchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 0),
+            Character::Mametchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 2, 0),
+            Character::Mametchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t1_low_care_1_disc_ginjirotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 1),
+            Character::Ginjirotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 2, 1),
+            Character::Ginjirotchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t1_low_care_2plus_disc_maskutchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 2),
+            Character::Maskutchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 2, 5),
+            Character::Maskutchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t1_high_care_0_1_disc_kuchipatchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 0),
+            Character::Kuchipatchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 5, 1),
+            Character::Kuchipatchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t1_high_care_2_3_disc_nyorotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 2),
+            Character::Nyorotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 5, 3),
+            Character::Nyorotchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t1_high_care_4plus_disc_tarakotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 4),
+            Character::Tarakotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type1, 10, 10),
+            Character::Tarakotchi
+        );
+    }
+
+    // Tamatchi T2 paths
+    #[test]
+    fn tamatchi_t2_low_care_2plus_disc_maskutchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 0, 2),
+            Character::Maskutchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 3, 2),
+            Character::Maskutchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 3, 5),
+            Character::Maskutchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t2_high_care_0_1_disc_kuchipatchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 0),
+            Character::Kuchipatchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 3, 1),
+            Character::Kuchipatchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t2_high_care_2_3_disc_nyorotchi() {
+        // care >= 3 and disc 2-3 but care_mistakes <= 3 && disc >= 2 → Maskutchi takes priority
+        // So we need care > 3 to avoid the Maskutchi branch
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 2),
+            Character::Nyorotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 3),
+            Character::Nyorotchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t2_high_care_4plus_disc_tarakotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 4),
+            Character::Tarakotchi
+        );
+    }
+
+    #[test]
+    fn tamatchi_t2_fallback_nyorotchi() {
+        // Low care (<=3), low disc (<2) → fallback
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 0, 0),
+            Character::Nyorotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Tamatchi, TeenType::Type2, 2, 1),
+            Character::Nyorotchi
+        );
+    }
+
+    // Kuchitamatchi T1 paths
+    #[test]
+    fn kuchitamatchi_t1_0_1_disc_kuchipatchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 0),
+            Character::Kuchipatchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 5, 1),
+            Character::Kuchipatchi
+        );
+    }
+
+    #[test]
+    fn kuchitamatchi_t1_2_3_disc_nyorotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 2),
+            Character::Nyorotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 5, 3),
+            Character::Nyorotchi
+        );
+    }
+
+    #[test]
+    fn kuchitamatchi_t1_4plus_disc_tarakotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 4),
+            Character::Tarakotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 10, 10),
+            Character::Tarakotchi
+        );
+    }
+
+    // Kuchitamatchi T2 paths
+    #[test]
+    fn kuchitamatchi_t2_0_1_disc_kuchipatchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 0),
+            Character::Kuchipatchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 5, 1),
+            Character::Kuchipatchi
+        );
+    }
+
+    #[test]
+    fn kuchitamatchi_t2_2_3_disc_nyorotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 2),
+            Character::Nyorotchi
+        );
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 5, 3),
+            Character::Nyorotchi
+        );
+    }
+
+    #[test]
+    fn kuchitamatchi_t2_4plus_disc_tarakotchi() {
+        assert_eq!(
+            resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 4),
+            Character::Tarakotchi
+        );
+    }
+
+    // Safety fallback
+    #[test]
+    fn safety_fallback_nyorotchi() {
+        // Non-teen character should hit safety fallback
+        assert_eq!(
+            resolve_adult(&Character::Mametchi, TeenType::Type1, 0, 0),
+            Character::Nyorotchi
+        );
+    }
+
+    // ── Teen → Adult via check_evolution ────────────────────────────────
+
+    #[test]
+    fn teen_to_adult_at_age_6() {
+        let now = base_time();
+        let mut state = make_teen(now, Character::Tamatchi, TeenType::Type1);
+        state.age = 6;
+        state.care_mistakes = 0;
+        state.discipline_mistakes = 0;
+        state.discipline = 75;
+
+        assert!(check_evolution(&mut state, now));
+        assert_eq!(state.stage, LifeStage::Adult);
+        assert_eq!(state.character, Character::Mametchi);
+        assert_eq!(state.discipline, 0);
+    }
+
+    #[test]
+    fn teen_no_evolution_before_age_6() {
+        let now = base_time();
+        let mut state = make_teen(now, Character::Tamatchi, TeenType::Type1);
+        state.age = 5;
+        assert!(!check_evolution(&mut state, now));
+        assert_eq!(state.stage, LifeStage::Teen);
+    }
+
+    // ── Adult → Special (Maskutchi T2 → Oyajitchi) ─────────────────────
+
+    #[test]
+    fn maskutchi_t2_to_oyajitchi_after_4_days() {
+        let now = base_time();
+        let mut state = make_adult(now, Character::Maskutchi, TeenType::Type2);
+        state.discipline = 50;
+
+        let tick_time = now + Duration::days(4);
+        assert!(check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Special);
+        assert_eq!(state.character, Character::Oyajitchi);
+        assert_eq!(state.discipline, 0);
+    }
+
+    #[test]
+    fn maskutchi_t2_no_evolution_before_4_days() {
+        let now = base_time();
+        let mut state = make_adult(now, Character::Maskutchi, TeenType::Type2);
+        let tick_time = now + Duration::days(4) - Duration::minutes(1);
+        assert!(!check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Adult);
+    }
+
+    #[test]
+    fn maskutchi_t1_no_special_evolution() {
+        // Maskutchi from T1 path should NOT evolve to Oyajitchi
+        let now = base_time();
+        let mut state = make_adult(now, Character::Maskutchi, TeenType::Type1);
+        let tick_time = now + Duration::days(10);
+        assert!(!check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Adult);
+    }
+
+    #[test]
+    fn non_maskutchi_adult_no_special_evolution() {
+        let now = base_time();
+        let mut state = make_adult(now, Character::Mametchi, TeenType::Type1);
+        let tick_time = now + Duration::days(10);
+        assert!(!check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Adult);
+    }
+
+    // ── Egg stage is not handled by check_evolution ────────────────────
+
+    #[test]
+    fn egg_not_handled_by_check_evolution() {
+        let now = base_time();
+        let mut state = PetState::new_egg(now);
+        let tick_time = now + Duration::minutes(10);
+        assert!(!check_evolution(&mut state, tick_time));
+        assert_eq!(state.stage, LifeStage::Egg);
+    }
+
+    // ── Exhaustive resolve_adult matrix ─────────────────────────────────
+
+    #[test]
+    fn exhaustive_p1_branching_matrix() {
+        // Tamatchi T1
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 0), Character::Mametchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 1, 0), Character::Mametchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 2, 0), Character::Mametchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 1), Character::Ginjirotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 1, 1), Character::Ginjirotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 2, 1), Character::Ginjirotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 2), Character::Maskutchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 0, 5), Character::Maskutchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 0), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 1), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 2), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 3), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 4), Character::Tarakotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type1, 3, 10), Character::Tarakotchi);
+
+        // Tamatchi T2
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 0, 2), Character::Maskutchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 3, 2), Character::Maskutchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 3, 5), Character::Maskutchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 0), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 1), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 2), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 3), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 4, 4), Character::Tarakotchi);
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 0, 0), Character::Nyorotchi); // fallback
+        assert_eq!(resolve_adult(&Character::Tamatchi, TeenType::Type2, 2, 1), Character::Nyorotchi); // fallback
+
+        // Kuchitamatchi T1
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 0), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 1), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 2), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 3), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 4), Character::Tarakotchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type1, 0, 10), Character::Tarakotchi);
+
+        // Kuchitamatchi T2
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 0), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 1), Character::Kuchipatchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 2), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 3), Character::Nyorotchi);
+        assert_eq!(resolve_adult(&Character::Kuchitamatchi, TeenType::Type2, 0, 4), Character::Tarakotchi);
+    }
+}

@@ -239,8 +239,8 @@ pub fn tick(state: &mut PetState, now: DateTime<Utc>) {
     // 7. Death conditions
     check_death(state, &stats, now);
 
-    // 8. Evolution (placeholder — will be implemented in task 6)
-    // check_evolution(state, now);
+    // 8. Evolution
+    crate::evolution::check_evolution(state, now);
 
     // 9. Update last_tick
     state.last_tick = now;
