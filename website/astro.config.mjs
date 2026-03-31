@@ -2,6 +2,5 @@ import { defineConfig } from 'astro/config';
 
 export default defineConfig({
   output: 'static',
-  site: 'https://siegerts.github.io',
-  base: '/tama96',
+  site: 'https://tama96.com',
 });
