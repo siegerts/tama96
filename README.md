@@ -2,6 +2,8 @@
 
 A virtual pet inspired by the 1996 Tamagotchi P1. Play on desktop (Tauri + React), in the terminal (ratatui TUI), or let an AI agent care for your pet via the bundled MCP server.
 
+**[Download the latest release](https://github.com/siegerts/tama96/releases)**
+
 <img width="353" height="445" alt="tama96-desktop" src="https://github.com/user-attachments/assets/138cd6f4-55a8-4bbe-baae-4789a4ef2467" />
 
 
