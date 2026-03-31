@@ -1,28 +1,35 @@
 ---
 import Base from '../layouts/Base.astro';
-const repo = 'https://github.com/siegerts/tama96/releases/latest';
+const dl = 'https://github.com/siegerts/tama96/releases/latest/download';
+const releases = 'https://github.com/siegerts/tama96/releases';
 ---
 
 <Base title="tama96 - Download">
   <h1>Download</h1>
-  <p class="intro">Grab the latest release for your platform.</p>
+  <p class="intro">Grab the latest release for your platform. All downloads on the <a href={releases}>releases page</a>.</p>
 
   <h2>Desktop app</h2>
   <div class="cards">
     <div class="card">
-      <div class="card-title">macOS</div>
-      <p>Apple Silicon + Intel</p>
-      <a href={repo} class="dl">Download .dmg</a>
+      <div class="card-title">macOS (Apple Silicon)</div>
+      <a href={`${dl}/tama96_0.1.0_aarch64.dmg`} class="dl">Download .dmg</a>
+    </div>
+    <div class="card">
+      <div class="card-title">macOS (Intel)</div>
+      <a href={`${dl}/tama96_0.1.0_x64.dmg`} class="dl">Download .dmg</a>
     </div>
     <div class="card">
       <div class="card-title">Windows</div>
       <p>64-bit installer</p>
-      <a href={repo} class="dl">Download .msi</a>
+      <a href={`${dl}/tama96_0.1.0_x64-setup.exe`} class="dl">Download .exe</a>
     </div>
     <div class="card">
-      <div class="card-title">Linux</div>
-      <p>.deb and .AppImage</p>
-      <a href={repo} class="dl">Download</a>
+      <div class="card-title">Linux (deb)</div>
+      <a href={`${dl}/tama96_0.1.0_amd64.deb`} class="dl">Download .deb</a>
+    </div>
+    <div class="card">
+      <div class="card-title">Linux (AppImage)</div>
+      <a href={`${dl}/tama96_0.1.0_amd64.AppImage`} class="dl">Download .AppImage</a>
     </div>
   </div>
 
@@ -31,15 +38,15 @@ const repo = 'https://github.com/siegerts/tama96/releases/latest';
   <div class="cards">
     <div class="card">
       <div class="card-title">macOS (Apple Silicon)</div>
-      <a href={`${repo}/download/tama-tui-aarch64-apple-darwin`} class="dl">Download</a>
+      <a href={`${dl}/tama-tui-aarch64-apple-darwin`} class="dl">Download</a>
     </div>
     <div class="card">
       <div class="card-title">macOS (Intel)</div>
-      <a href={`${repo}/download/tama-tui-x86_64-apple-darwin`} class="dl">Download</a>
+      <a href={`${dl}/tama-tui-x86_64-apple-darwin`} class="dl">Download</a>
     </div>
     <div class="card">
       <div class="card-title">Linux (x64)</div>
-      <a href={`${repo}/download/tama-tui-x86_64-unknown-linux-gnu`} class="dl">Download</a>
+      <a href={`${dl}/tama-tui-x86_64-unknown-linux-gnu`} class="dl">Download</a>
     </div>
   </div>
   <p class="note">On macOS/Linux, make it executable: <code>chmod +x tama-tui-*</code></p>
