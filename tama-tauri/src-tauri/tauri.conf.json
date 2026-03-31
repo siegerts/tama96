@@ -1,12 +1,12 @@
 {
   "productName": "tama96",
   "version": "0.1.0",
-  "identifier": "com.tama96.app",
+  "identifier": "com.tama96.desktop",
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm run dev --prefix ../ui",
-    "beforeBuildCommand": "npm run build --prefix ../ui"
+    "beforeDevCommand": "cd ../ui && npm run dev",
+    "beforeBuildCommand": "cd ../ui && npm run build"
   },
   "app": {
     "withGlobalTauri": false,
