@@ -193,12 +193,30 @@ impl Drop for LockGuard {
 }
 
 /// Check whether a process with the given PID is still alive.
-///
-/// Uses `kill(pid, 0)` which checks for process existence without sending a signal.
 fn is_pid_alive(pid: u32) -> bool {
-    // SAFETY: kill with signal 0 only checks process existence, no signal is sent.
-    let ret = unsafe { libc::kill(pid as libc::pid_t, 0) };
-    ret == 0
+    #[cfg(unix)]
+    {
+        // SAFETY: kill with signal 0 only checks process existence, no signal is sent.
+        let ret = unsafe { libc::kill(pid as libc::pid_t, 0) };
+        ret == 0
+    }
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .output()
+            .map(|o| {
+                let out = String::from_utf8_lossy(&o.stdout);
+                out.contains(&pid.to_string())
+            })
+            .unwrap_or(false)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = pid;
+        false
+    }
 }
 
 /// Acquire a lockfile at `path`. The lock file contains the PID of the owning process.
