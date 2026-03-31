@@ -117,10 +117,17 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
   return (
     <div style={overlayStyle}>
       <div style={panelStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <h2 style={{ margin: 0, fontSize: 16, fontFamily: "monospace" }}>Agent Permissions</h2>
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close settings">✕</button>
         </div>
+
+        <p style={{ fontSize: 11, color: "#999", fontFamily: "monospace", margin: "0 0 12px", lineHeight: 1.5 }}>
+          Control what the MCP agent can do with your pet.
+          When connected via an AI tool, the agent can perform
+          actions on your behalf. Toggle individual actions
+          on/off and set rate limits per hour.
+        </p>
 
         {error && <p style={{ color: "#f44336", fontSize: 12, margin: "0 0 8px" }}>{error}</p>}
 
