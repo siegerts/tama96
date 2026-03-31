@@ -10,6 +10,7 @@ dist/
 # Tauri
 tama-tauri/src-tauri/target/
 tama-tauri/src-tauri/gen/
+tama-tauri/src-tauri/mcp-server-dist/
 
 # OS
 .DS_Store
