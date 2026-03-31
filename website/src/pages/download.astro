@@ -53,6 +53,7 @@ const releases = 'https://github.com/siegerts/tama96/releases';
         <a href={`${dl}/tama-tui-x86_64-pc-windows-msvc.zip`} class="dl">Download .zip</a>
       </div>
     </div>
+    <p class="note mac-hint" data-platform="mac">macOS may block unsigned apps. After installing, run: <code>xattr -cr /Applications/tama96.app</code></p>
     <p class="note tui-hint" data-platform-hide="windows">Extract and run: <code>tar xzf tama-tui-*.tar.gz && ./tama-tui</code></p>
   </section>
 
@@ -77,9 +78,11 @@ const releases = 'https://github.com/siegerts/tama96/releases';
       document.querySelectorAll('#primary .card').forEach(card => {
         if (card.dataset.platform !== platform) card.style.display = 'none';
       });
-      // Hide tar hint on Windows
       if (platform === 'windows') {
         document.querySelector('.tui-hint')?.style.setProperty('display', 'none');
+      }
+      if (platform !== 'mac') {
+        document.querySelector('.mac-hint')?.style.setProperty('display', 'none');
       }
     } else {
       // Can't detect — show everything
