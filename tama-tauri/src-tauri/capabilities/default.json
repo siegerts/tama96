@@ -7,6 +7,14 @@
   "permissions": [
     "core:default",
     "notification:default",
-    "shell:default"
+    "shell:default",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "url": "https://**"
+        }
+      ]
+    }
   ]
 }

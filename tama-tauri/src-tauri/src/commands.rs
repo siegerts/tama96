@@ -135,6 +135,19 @@ pub fn hatch_new_egg(pet: State<'_, SharedPetState>) -> Result<PetState, String>
     save_and_snapshot(&pet)
 }
 
+// ── MCP config command ───────────────────────────────────────────────────
+
+#[tauri::command]
+pub fn get_mcp_config() -> Result<String, String> {
+    let config_path = dirs::home_dir()
+        .expect("could not resolve home directory")
+        .join(".tama96")
+        .join("mcp_config.json");
+
+    std::fs::read_to_string(&config_path)
+        .map_err(|e| format!("Could not read MCP config: {e}"))
+}
+
 // ── Permission commands ─────────────────────────────────────────────────────
 
 #[tauri::command]

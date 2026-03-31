@@ -41,6 +41,7 @@ enum RunMode {
 enum InputMode {
     Normal,
     Feed,
+    About,
 }
 
 fn tama_dir() -> std::path::PathBuf {
@@ -266,13 +267,47 @@ fn render_ui(
     } else {
         match input_mode {
             InputMode::Feed => "Feed: [m]eal or [s]nack? (Esc to cancel)".to_string(),
-            InputMode::Normal => "f:feed  g:game  d:discipline  c:clean  l:lights  i:medicine  q:quit".to_string(),
+            InputMode::About => "Press Esc to close".to_string(),
+            InputMode::Normal => "f:feed  g:game  d:discipline  c:clean  l:lights  i:med  a:about  q:quit".to_string(),
         }
     };
     let hints = Paragraph::new(hints_text)
         .alignment(Alignment::Center)
         .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hints, chunks[5]);
+
+    // ── About overlay ──
+    if *input_mode == InputMode::About {
+        let about_text = vec![
+            Line::from(""),
+            Line::from(Span::styled("tama96 v0.1.0", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from(Span::styled("Made by @siegerts", Style::default().fg(Color::Cyan))),
+            Line::from(Span::styled("https://x.com/siegerts", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(Span::styled("Built with Kiro", Style::default().fg(Color::Cyan))),
+            Line::from(Span::styled("https://kiro.dev/", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(Span::styled("https://github.com/siegerts/tama96", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(Span::styled("\"Tamagotchi\" is a trademark of Bandai Co., Ltd.", Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled("Not affiliated with or endorsed by Bandai.", Style::default().fg(Color::DarkGray))),
+            Line::from(""),
+            Line::from(Span::styled("MIT License", Style::default().fg(Color::DarkGray))),
+        ];
+        let about = Paragraph::new(about_text)
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL).title(" About "));
+        // Render over the sprite + meters area
+        let about_area = ratatui::layout::Rect {
+            x: outer.x + 2,
+            y: outer.y + 1,
+            width: outer.width.saturating_sub(4),
+            height: outer.height.saturating_sub(3),
+        };
+        frame.render_widget(ratatui::widgets::Clear, about_area);
+        frame.render_widget(about, about_area);
+    }
 }
 
 // ── Main run loop ───────────────────────────────────────────────────────────
@@ -344,6 +379,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if event::poll(Duration::from_secs(1))? {
             if let Event::Key(key) = event::read()? {
                 match (&input_mode, &run_mode) {
+                    // ── About mode ──
+                    (InputMode::About, _) => match key.code {
+                        KeyCode::Esc | KeyCode::Char('a') | KeyCode::Char('q') => {
+                            input_mode = InputMode::Normal;
+                        }
+                        _ => {}
+                    },
                     // ── Feed sub-mode ──
                     (InputMode::Feed, RunMode::Standalone) => match key.code {
                         KeyCode::Char('m') => {
@@ -392,6 +434,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     // ── Normal mode ──
                     (InputMode::Normal, _) => match key.code {
                         KeyCode::Char('q') => break,
+                        KeyCode::Char('a') => { input_mode = InputMode::About; }
                         KeyCode::Char('f') => { input_mode = InputMode::Feed; }
                         KeyCode::Char('g') => {
                             let mut rng = rand::thread_rng();

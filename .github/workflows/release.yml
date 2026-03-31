@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action/setup@v1
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build MCP server
+        run: |
+          cd mcp-server
+          npm ci
+          npm run build
+
+      - name: Install UI dependencies
+        run: |
+          cd tama-tauri/ui
+          npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tama-tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: 'tama96 ${{ github.ref_name }}'
+          releaseBody: 'See the README for setup instructions.'
+          releaseDraft: true
+          args: --target ${{ matrix.target }} --config '{"bundle":{"resources":["../../mcp-server/dist/**","../../mcp-server/package.json"]}}'
+
+  build-tui:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action/setup@v1
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build TUI
+        run: cargo build --release --target ${{ matrix.target }} -p tama-tui
+
+      - name: Upload TUI binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: tama-tui-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/tama-tui*

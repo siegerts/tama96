@@ -148,17 +148,37 @@ If the desktop app is already running, the TUI enters client mode automatically 
 
 ### MCP server
 
-```bash
-cd mcp-server && npm install && npm run build
+The MCP server lets AI tools (Claude Desktop, Kiro, etc.) interact with your pet. It's bundled with the desktop app and spawned automatically.
+
+On startup, the app writes a ready-to-use config to `~/.tama96/mcp_config.json`. To connect your AI tool, copy the contents of that file into your tool's MCP config:
+
+- Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+- Kiro: `.kiro/settings/mcp.json` in your workspace
+
+The config looks like this (paths are filled in automatically):
+
+```json
+{
+  "mcpServers": {
+    "tama96": {
+      "command": "node",
+      "args": ["/path/to/mcp-server/dist/index.js"]
+    }
+  }
+}
 ```
 
-Normally spawned automatically by the Tauri app as a sidecar. For standalone testing: `npm start`
-
-Communicates with the Tauri backend over a localhost TCP socket (port written to `~/.tama96/mcp_port`).
+The MCP server needs the desktop app running (it communicates over a local TCP socket). The port is written to `~/.tama96/mcp_port` on startup.
 
 Tools: `feed`, `play_game`, `discipline`, `give_medicine`, `clean_poop`, `toggle_lights`, `get_status`
 
 Resources: `pet://status`, `pet://evolution-chart`, `pet://permissions`
+
+For development/standalone testing:
+
+```bash
+cd mcp-server && npm install && npm run build && npm start
+```
 
 ## Agent permissions
 
@@ -170,6 +190,36 @@ AI agents are gated by a permission system you control:
 
 Configure via the "settings" button in the desktop app or edit `~/.tama96/permissions.json` directly. The settings panel explains what "agent" means — it's an AI tool connected via MCP that can perform actions on your pet's behalf.
 
+## Building for distribution
+
+To create release builds for all platforms, push a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+This triggers the GitHub Actions workflow which builds:
+- macOS: `.dmg` (both Apple Silicon and Intel)
+- Windows: `.msi` installer
+- Linux: `.deb` and `.AppImage`
+- TUI: standalone binaries for all platforms
+
+Builds appear as a draft release on GitHub. The MCP server JS files are bundled inside the app resources.
+
+To build locally for your current platform:
+
+```bash
+# Build MCP server first
+cd mcp-server && npm ci && npm run build && cd ..
+
+# Build the desktop app
+cd tama-tauri && npx @tauri-apps/cli build
+
+# Build the TUI
+cargo build --release -p tama-tui
+```
+
 ## Data directory
 
 Everything lives in `~/.tama96/`:
@@ -178,8 +228,9 @@ Everything lives in `~/.tama96/`:
 |------|---------|
 | `state.json` | Pet state (created on first run) |
 | `permissions.json` | Agent permission config |
-| `tama96.lock` | Single-instance lockfile |
+| `mcp_config.json` | Ready-to-copy MCP config for AI tools |
 | `mcp_port` | TCP port for MCP bridge |
+| `tama96.lock` | Single-instance lockfile |
 
 ## Disclaimer
 
