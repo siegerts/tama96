@@ -2,6 +2,14 @@
 
 A virtual pet inspired by the 1996 Tamagotchi P1. Play on desktop (Tauri + React), in the terminal (ratatui TUI), or let an AI agent care for your pet via the bundled MCP server.
 
+<img width="353" height="445" alt="tama96-desktop" src="https://github.com/user-attachments/assets/138cd6f4-55a8-4bbe-baae-4789a4ef2467" />
+
+
+## TUI
+
+<img width="607" height="373" alt="tama96-tui" src="https://github.com/user-attachments/assets/986bbc3b-2e39-48c4-8b7c-3b948a8b4490" />
+
+
 ```
 ┌──────────────────────────────────────────────────┐
 │  Egg → Babytchi → Marutchi → Teen → Adult → …    │
