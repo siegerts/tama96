@@ -240,6 +240,14 @@ Everything lives in `~/.tama96/`:
 | `mcp_port` | TCP port for MCP bridge |
 | `tama96.lock` | Single-instance lockfile |
 
+## Built with Kiro
+
+This project was built using [Kiro](https://kiro.dev/), starting from a spec that defined the requirements, design, and implementation tasks. The spec documents are in the repo:
+
+- [Requirements](.kiro/specs/tama96/requirements.md) - what the project should do
+- [Design](.kiro/specs/tama96/design.md) - architecture and technical decisions
+- [Tasks](.kiro/specs/tama96/tasks.md) - implementation breakdown
+
 ## Disclaimer
 
 This is an independent hobby project. It is not affiliated with, endorsed by, or connected to Bandai Co., Ltd. in any way. "Tamagotchi" is a registered trademark of Bandai. No original Bandai code, assets, or ROM data were used. Gameplay mechanics were referenced from publicly available wiki documentation.
