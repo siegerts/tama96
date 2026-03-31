@@ -10,15 +10,7 @@
   },
   "app": {
     "withGlobalTauri": false,
-    "windows": [
-      {
-        "title": "tama96",
-        "width": 400,
-        "height": 600,
-        "resizable": true,
-        "center": true
-      }
-    ]
+    "windows": []
   },
   "bundle": {
     "active": true,

@@ -5,8 +5,39 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::time::sleep;
 
-/// Default path to the MCP server entry point, relative to the app working directory.
-const DEFAULT_MCP_SERVER_PATH: &str = "mcp-server/dist/index.js";
+/// MCP server entry point filename within the mcp-server/dist/ directory.
+const MCP_SERVER_ENTRY: &str = "mcp-server/dist/index.js";
+
+/// Resolve the MCP server path relative to the workspace root.
+/// In dev mode the working directory is typically `tama-tauri/src-tauri/`,
+/// so we walk up to find the workspace root (where `Cargo.toml` has [workspace]).
+fn resolve_mcp_server_path() -> String {
+    if let Ok(p) = std::env::var("TAMA96_MCP_SERVER_PATH") {
+        return p;
+    }
+
+    // Try current dir first
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let candidate = cwd.join(MCP_SERVER_ENTRY);
+    if candidate.exists() {
+        return candidate.to_string_lossy().into_owned();
+    }
+
+    // Walk up to 4 parent directories looking for the workspace root
+    let mut dir = cwd.as_path();
+    for _ in 0..4 {
+        if let Some(parent) = dir.parent() {
+            let candidate = parent.join(MCP_SERVER_ENTRY);
+            if candidate.exists() {
+                return candidate.to_string_lossy().into_owned();
+            }
+            dir = parent;
+        }
+    }
+
+    // Fallback to the literal path
+    MCP_SERVER_ENTRY.to_string()
+}
 
 /// Maximum backoff delay between restart attempts (30 seconds).
 const MAX_BACKOFF_SECS: u64 = 30;
@@ -20,8 +51,7 @@ const INITIAL_BACKOFF_SECS: u64 = 2;
 /// with exponential backoff (2s, 4s, 8s, 16s, max 30s) on unexpected exit.
 /// The loop terminates when the cancellation token is set (on app quit).
 pub async fn start_sidecar(cancel: Arc<AtomicBool>) {
-    let server_path = std::env::var("TAMA96_MCP_SERVER_PATH")
-        .unwrap_or_else(|_| DEFAULT_MCP_SERVER_PATH.to_string());
+    let server_path = resolve_mcp_server_path();
 
     let mut backoff_secs = INITIAL_BACKOFF_SECS;
 
