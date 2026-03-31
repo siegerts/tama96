@@ -8,13 +8,7 @@ const releases = 'https://github.com/siegerts/tama96/releases';
   <h1>Download</h1>
   <p class="intro">Grab the latest release for your platform. All downloads on the <a href={releases}>releases page</a>.</p>
 
-  <div id="primary">
-    <!-- populated by JS based on detected platform -->
-  </div>
-
-  <details id="all-platforms">
-    <summary>All platforms</summary>
-
+  <section id="primary">
     <h2>Desktop app</h2>
     <div class="cards">
       <div class="card" data-platform="mac">
@@ -41,7 +35,6 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     </div>
 
     <h2>Terminal (TUI)</h2>
-    <p class="desc">Standalone binary, no dependencies.</p>
     <div class="cards">
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Apple Silicon)</div>
@@ -60,6 +53,11 @@ const releases = 'https://github.com/siegerts/tama96/releases';
         <a href={`${dl}/tama-tui-x86_64-pc-windows-msvc.zip`} class="dl">Download .zip</a>
       </div>
     </div>
+    <p class="note tui-hint" data-platform-hide="windows">Extract and run: <code>tar xzf tama-tui-*.tar.gz && ./tama-tui</code></p>
+  </section>
+
+  <details id="all-platforms">
+    <summary>All platforms</summary>
   </details>
 
   <p class="note">Or build from source: <code>cargo install --git https://github.com/siegerts/tama96 tama-tui</code></p>
@@ -75,21 +73,25 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     const ua = navigator.userAgent;
     const platform = /Mac/.test(ua) ? 'mac' : /Win/.test(ua) ? 'windows' : /Linux/.test(ua) ? 'linux' : null;
     if (platform) {
-      const primary = document.getElementById('primary');
-      const cards = document.querySelectorAll(`[data-platform="${platform}"]`);
-      if (cards.length) {
-        let html = '<h2>Recommended for you</h2><div class="cards">';
-        cards.forEach(card => html += card.outerHTML);
-        html += '</div>';
-        if (platform !== 'windows') {
-          html += '<p class="note">TUI: <code>tar xzf tama-tui-*.tar.gz && ./tama-tui</code></p>';
-        }
-        primary.innerHTML = html;
+      // Hide cards that don't match the detected platform
+      document.querySelectorAll('#primary .card').forEach(card => {
+        if (card.dataset.platform !== platform) card.style.display = 'none';
+      });
+      // Hide tar hint on Windows
+      if (platform === 'windows') {
+        document.querySelector('.tui-hint')?.style.setProperty('display', 'none');
       }
     } else {
-      // Can't detect platform — expand all platforms by default
+      // Can't detect — show everything
       document.getElementById('all-platforms').open = true;
     }
+    // Move non-matching cards into the "All platforms" details for reference
+    const details = document.getElementById('all-platforms');
+    const primary = document.getElementById('primary');
+    const clone = primary.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('.card').forEach(card => card.style.display = '');
+    details.appendChild(clone);
   </script>
 
   <style>
@@ -97,7 +99,7 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     .intro { color: var(--text-secondary); margin-bottom: 36px; }
     h2 { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
     .desc { color: var(--text-secondary); font-size: 14px; margin: -6px 0 14px; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 32px; }
+    .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 32px; max-width: 500px; }
     .card {
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
