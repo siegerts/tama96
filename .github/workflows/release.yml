@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-app:
     strategy:
       fail-fast: false
       matrix:
@@ -55,8 +55,6 @@ jobs:
           mkdir -p tama-tauri/src-tauri/mcp-server-dist
           cp -r mcp-server/dist/* tama-tauri/src-tauri/mcp-server-dist/
           cp mcp-server/package.json tama-tauri/src-tauri/mcp-server-dist/
-          echo "Contents of mcp-server-dist:"
-          ls -la tama-tauri/src-tauri/mcp-server-dist/
         shell: bash
 
       - name: Install UI dependencies and build
@@ -84,12 +82,20 @@ jobs:
         include:
           - platform: macos-latest
             target: aarch64-apple-darwin
+            binary: tama-tui
+            asset: tama-tui-aarch64-apple-darwin
           - platform: macos-latest
             target: x86_64-apple-darwin
+            binary: tama-tui
+            asset: tama-tui-x86_64-apple-darwin
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            binary: tama-tui
+            asset: tama-tui-x86_64-unknown-linux-gnu
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
+            binary: tama-tui.exe
+            asset: tama-tui-x86_64-pc-windows-msvc.exe
 
     runs-on: ${{ matrix.platform }}
 
@@ -104,8 +110,15 @@ jobs:
       - name: Build TUI
         run: cargo build --release --target ${{ matrix.target }} -p tama-tui
 
-      - name: Upload TUI binary
-        uses: actions/upload-artifact@v4
+      - name: Prepare binary
+        shell: bash
+        run: cp "target/${{ matrix.target }}/release/${{ matrix.binary }}" "${{ matrix.asset }}"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
         with:
-          name: tama-tui-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/tama-tui*
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          files: ${{ matrix.asset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
