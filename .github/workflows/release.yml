@@ -55,12 +55,15 @@ jobs:
           mkdir -p tama-tauri/src-tauri/mcp-server-dist
           cp -r mcp-server/dist/* tama-tauri/src-tauri/mcp-server-dist/
           cp mcp-server/package.json tama-tauri/src-tauri/mcp-server-dist/
+          echo "Contents of mcp-server-dist:"
+          ls -la tama-tauri/src-tauri/mcp-server-dist/
         shell: bash
 
-      - name: Install UI dependencies
+      - name: Install UI dependencies and build
         run: |
           cd tama-tauri/ui
           npm ci
+          npm run build
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -72,7 +75,7 @@ jobs:
           releaseName: 'tama96 ${{ github.ref_name }}'
           releaseBody: 'See the README for setup instructions.'
           releaseDraft: true
-          args: --target ${{ matrix.target }} --config '{"bundle":{"resources":["mcp-server-dist/**"]}}'
+          args: --target ${{ matrix.target }} --config '{"build":{"beforeBuildCommand":""}}'
 
   build-tui:
     strategy:
