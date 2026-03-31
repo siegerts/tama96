@@ -8,48 +8,60 @@ const releases = 'https://github.com/siegerts/tama96/releases';
   <h1>Download</h1>
   <p class="intro">Grab the latest release for your platform. All downloads on the <a href={releases}>releases page</a>.</p>
 
-  <h2>Desktop app</h2>
-  <div class="cards">
-    <div class="card">
-      <div class="card-title">macOS (Apple Silicon)</div>
-      <a href={`${dl}/tama96_0.1.0_aarch64.dmg`} class="dl">Download .dmg</a>
-    </div>
-    <div class="card">
-      <div class="card-title">macOS (Intel)</div>
-      <a href={`${dl}/tama96_0.1.0_x64.dmg`} class="dl">Download .dmg</a>
-    </div>
-    <div class="card">
-      <div class="card-title">Windows</div>
-      <p>64-bit installer</p>
-      <a href={`${dl}/tama96_0.1.0_x64-setup.exe`} class="dl">Download .exe</a>
-    </div>
-    <div class="card">
-      <div class="card-title">Linux (deb)</div>
-      <a href={`${dl}/tama96_0.1.0_amd64.deb`} class="dl">Download .deb</a>
-    </div>
-    <div class="card">
-      <div class="card-title">Linux (AppImage)</div>
-      <a href={`${dl}/tama96_0.1.0_amd64.AppImage`} class="dl">Download .AppImage</a>
-    </div>
+  <div id="primary">
+    <!-- populated by JS based on detected platform -->
   </div>
 
-  <h2>Terminal (TUI)</h2>
-  <p class="desc">Standalone binary, no dependencies.</p>
-  <div class="cards">
-    <div class="card">
-      <div class="card-title">macOS (Apple Silicon)</div>
-      <a href={`${dl}/tama-tui-aarch64-apple-darwin`} class="dl">Download</a>
+  <details id="all-platforms">
+    <summary>All platforms</summary>
+
+    <h2>Desktop app</h2>
+    <div class="cards">
+      <div class="card" data-platform="mac">
+        <div class="card-title">macOS (Apple Silicon)</div>
+        <a href={`${dl}/tama96_0.1.0_aarch64.dmg`} class="dl">Download .dmg</a>
+      </div>
+      <div class="card" data-platform="mac">
+        <div class="card-title">macOS (Intel)</div>
+        <a href={`${dl}/tama96_0.1.0_x64.dmg`} class="dl">Download .dmg</a>
+      </div>
+      <div class="card" data-platform="windows">
+        <div class="card-title">Windows</div>
+        <p>64-bit installer</p>
+        <a href={`${dl}/tama96_0.1.0_x64-setup.exe`} class="dl">Download .exe</a>
+      </div>
+      <div class="card" data-platform="linux">
+        <div class="card-title">Linux (deb)</div>
+        <a href={`${dl}/tama96_0.1.0_amd64.deb`} class="dl">Download .deb</a>
+      </div>
+      <div class="card" data-platform="linux">
+        <div class="card-title">Linux (AppImage)</div>
+        <a href={`${dl}/tama96_0.1.0_amd64.AppImage`} class="dl">Download .AppImage</a>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">macOS (Intel)</div>
-      <a href={`${dl}/tama-tui-x86_64-apple-darwin`} class="dl">Download</a>
+
+    <h2>Terminal (TUI)</h2>
+    <p class="desc">Standalone binary, no dependencies.</p>
+    <div class="cards">
+      <div class="card" data-platform="mac">
+        <div class="card-title">macOS (Apple Silicon)</div>
+        <a href={`${dl}/tama-tui-aarch64-apple-darwin.tar.gz`} class="dl">Download .tar.gz</a>
+      </div>
+      <div class="card" data-platform="mac">
+        <div class="card-title">macOS (Intel)</div>
+        <a href={`${dl}/tama-tui-x86_64-apple-darwin.tar.gz`} class="dl">Download .tar.gz</a>
+      </div>
+      <div class="card" data-platform="linux">
+        <div class="card-title">Linux (x64)</div>
+        <a href={`${dl}/tama-tui-x86_64-unknown-linux-gnu.tar.gz`} class="dl">Download .tar.gz</a>
+      </div>
+      <div class="card" data-platform="windows">
+        <div class="card-title">Windows (x64)</div>
+        <a href={`${dl}/tama-tui-x86_64-pc-windows-msvc.zip`} class="dl">Download .zip</a>
+      </div>
     </div>
-    <div class="card">
-      <div class="card-title">Linux (x64)</div>
-      <a href={`${dl}/tama-tui-x86_64-unknown-linux-gnu`} class="dl">Download</a>
-    </div>
-  </div>
-  <p class="note">On macOS/Linux, make it executable: <code>chmod +x tama-tui-*</code></p>
+  </details>
+
   <p class="note">Or build from source: <code>cargo install --git https://github.com/siegerts/tama96 tama-tui</code></p>
 
   <h2>Requirements</h2>
@@ -59,12 +71,33 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     <li>The TUI is a single binary with zero dependencies</li>
   </ul>
 
+  <script>
+    const ua = navigator.userAgent;
+    const platform = /Mac/.test(ua) ? 'mac' : /Win/.test(ua) ? 'windows' : /Linux/.test(ua) ? 'linux' : null;
+    if (platform) {
+      const primary = document.getElementById('primary');
+      const cards = document.querySelectorAll(`[data-platform="${platform}"]`);
+      if (cards.length) {
+        let html = '<h2>Recommended for you</h2><div class="cards">';
+        cards.forEach(card => html += card.outerHTML);
+        html += '</div>';
+        if (platform !== 'windows') {
+          html += '<p class="note">TUI: <code>tar xzf tama-tui-*.tar.gz && ./tama-tui</code></p>';
+        }
+        primary.innerHTML = html;
+      }
+    } else {
+      // Can't detect platform — expand all platforms by default
+      document.getElementById('all-platforms').open = true;
+    }
+  </script>
+
   <style>
     h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
     .intro { color: var(--text-secondary); margin-bottom: 36px; }
     h2 { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
     .desc { color: var(--text-secondary); font-size: 14px; margin: -6px 0 14px; }
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 32px; }
     .card {
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
@@ -88,6 +121,14 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     }
     .dl:hover { background: #3d4530; text-decoration: none; }
     .note { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
+    details { margin-bottom: 24px; }
+    summary {
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+    summary:hover { color: var(--text-primary); }
     ul { list-style: none; padding: 0; }
     li {
       font-size: 14px;
@@ -103,6 +144,5 @@ const releases = 'https://github.com/siegerts/tama96/releases';
       border-radius: 50%;
       background: #8a9470;
     }
-    @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
   </style>
 </Base>
