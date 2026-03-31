@@ -48,7 +48,16 @@ pub fn get_state(pet: State<'_, SharedPetState>) -> Result<PetState, String> {
 pub fn feed_meal(pet: State<'_, SharedPetState>) -> Result<PetState, String> {
     {
         let mut state = pet.lock().map_err(|e| e.to_string())?;
-        actions::feed_meal(&mut state).map_err(|e| format!("{e:?}"))?;
+        let pre_hunger = state.hunger;
+        let pre_weight = state.weight;
+        let pre_sleeping = state.is_sleeping;
+        let pre_sick = state.is_sick;
+        let pre_alive = state.is_alive;
+        
+        let result = actions::feed_meal(&mut state).map_err(|e| format!("{e:?}"))?;
+        
+        println!("feed_meal: pre hunger={}, post hunger={}, pre_weight={}, post_weight={}, alive={}, sleeping={}, sick={}, result={:?}", 
+            pre_hunger, state.hunger, pre_weight, state.weight, pre_alive, pre_sleeping, pre_sick, result);
     }
     save_and_snapshot(&pet)
 }

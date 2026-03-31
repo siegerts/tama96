@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePetState } from "./hooks/usePetState";
 import PetDisplay from "./components/PetDisplay";
-import ActionBar from "./components/ActionBar";
 import DeathScreen from "./components/DeathScreen";
 import PermissionsPanel from "./components/PermissionsPanel";
 
@@ -74,11 +73,7 @@ function App() {
       {!state.is_alive ? (
         <DeathScreen state={state} onHatchNewEgg={hatchNewEgg} />
       ) : (
-        <PetDisplay state={state} />
-      )}
-
-      {state.is_alive && (
-        <ActionBar
+        <PetDisplay
           state={state}
           feedMeal={feedMeal}
           feedSnack={feedSnack}
@@ -118,7 +113,7 @@ function App() {
           aria-label="Agent permissions"
           title="Agent Permissions"
         >
-          cfg
+          settings
         </button>
       </div>
 
@@ -141,8 +136,10 @@ const bottomRow: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  marginTop: "auto",
+  marginTop: 4,
   marginBottom: 2,
+  alignSelf: "flex-start",
+  paddingLeft: 8,
 };
 
 const cfgStyle: React.CSSProperties = {
@@ -168,10 +165,9 @@ const dotBtn = (color: string): React.CSSProperties => ({
 
 const colorPicker: React.CSSProperties = {
   position: "absolute",
-  bottom: "100%",
-  left: "50%",
-  transform: "translateX(-50%)",
-  marginBottom: 6,
+  bottom: 0,
+  left: "100%",
+  marginLeft: 6,
   display: "flex",
   flexWrap: "wrap",
   gap: 4,

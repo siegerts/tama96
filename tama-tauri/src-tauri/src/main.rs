@@ -101,7 +101,7 @@ fn main() {
             // ── Create main window with transparent titlebar ────────────
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("tama96")
-                .inner_size(260.0, 460.0)
+                .inner_size(280.0, 360.0)
                 .resizable(false)
                 .center()
                 .always_on_top(true);
