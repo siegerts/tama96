@@ -14,7 +14,7 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 
 use tauri_plugin_notification::NotificationExt;
@@ -98,6 +98,39 @@ fn main() {
             commands::update_permissions,
         ])
         .setup(move |app| {
+            // ── Create main window with transparent titlebar ────────────
+            let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+                .title("tama96")
+                .inner_size(260.0, 460.0)
+                .resizable(false)
+                .center()
+                .always_on_top(true);
+
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+
+            let window = win_builder.build().unwrap();
+
+            // Set macOS window background color (default teal shell)
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow};
+                use cocoa::base::{id, nil};
+
+                let ns_window = window.ns_window().unwrap() as id;
+                unsafe {
+                    // Teal: #5b9a9a
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                        nil,
+                        91.0 / 255.0,
+                        154.0 / 255.0,
+                        154.0 / 255.0,
+                        1.0,
+                    );
+                    ns_window.setBackgroundColor_(bg_color);
+                }
+            }
+
             // ── System tray ─────────────────────────────────────────────
             let show_item = MenuItemBuilder::with_id("show", "Show Window").build(app)?;
             let status_item = MenuItemBuilder::with_id("status", "Pet Status").build(app)?;
@@ -118,12 +151,15 @@ fn main() {
 
             let tray_pet = Arc::clone(&tick_pet);
 
+            // Load tray icon from embedded PNG bytes
+            let icon_bytes = include_bytes!("../icons/32x32.png");
+            let icon_image = image::load_from_memory(icon_bytes).expect("failed to decode tray icon");
+            let rgba = icon_image.to_rgba8();
+            let (w, h) = rgba.dimensions();
+            let tray_icon = Image::new_owned(rgba.into_raw(), w, h);
+
             let _tray = TrayIconBuilder::new()
-                .icon(
-                    app.default_window_icon()
-                        .cloned()
-                        .unwrap_or_else(|| Image::new(&[0u8; 4], 1, 1)),
-                )
+                .icon(tray_icon)
                 .tooltip(&tooltip)
                 .menu(&tray_menu)
                 .on_menu_event(move |app_handle, event| match event.id().as_ref() {
@@ -207,7 +243,7 @@ fn main() {
                                 .notification()
                                 .builder()
                                 .title("tama96")
-                                .body("Your pet has died… 💀")
+                                .body("Your pet has died.")
                                 .show();
                         } else if state.stage != old_stage && state.is_alive {
                             let _ = app_handle
@@ -215,7 +251,7 @@ fn main() {
                                 .builder()
                                 .title("tama96")
                                 .body(format!(
-                                    "Your pet evolved to {:?} ({:?})! 🎉",
+                                    "Your pet evolved to {:?} ({:?}).",
                                     state.character, state.stage
                                 ))
                                 .show();
@@ -227,7 +263,7 @@ fn main() {
                                     .notification()
                                     .builder()
                                     .title("tama96")
-                                    .body("Your pet is starving! 🍔")
+                                    .body("Your pet is starving.")
                                     .show();
                             }
                             if state.happiness == 0 && old_happiness > 0 {
@@ -235,7 +271,7 @@ fn main() {
                                     .notification()
                                     .builder()
                                     .title("tama96")
-                                    .body("Your pet is miserable! 😢")
+                                    .body("Your pet is unhappy.")
                                     .show();
                             }
                         }

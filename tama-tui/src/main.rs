@@ -41,14 +41,15 @@ fn tama_dir() -> std::path::PathBuf {
         .join(".tama96")
 }
 
-/// Build a hearts row: ♥ for filled, ♡ for empty, up to `max` hearts.
+/// Build a hearts row: filled blocks for filled, light shade for empty.
 fn hearts_string(filled: u8, max: u8) -> String {
     let mut s = String::new();
     for i in 0..max {
+        if i > 0 { s.push(' '); }
         if i < filled {
-            s.push('♥');
+            s.push_str("\u{2588}\u{2588}"); // ██
         } else {
-            s.push('♡');
+            s.push_str("\u{2591}\u{2591}"); // ░░
         }
     }
     s
@@ -59,13 +60,13 @@ fn status_indicators(state: &PetState) -> String {
     let mut parts: Vec<String> = Vec::new();
 
     if state.poop_count > 0 {
-        parts.push("💩".repeat(state.poop_count as usize));
+        parts.push(format!("POOP:{}", "o".repeat(state.poop_count as usize)));
     }
     if state.is_sick {
-        parts.push("🤒".to_string());
+        parts.push("SICK".to_string());
     }
     if state.is_sleeping {
-        parts.push("💤".to_string());
+        parts.push("ZZZ".to_string());
     }
 
     if parts.is_empty() {

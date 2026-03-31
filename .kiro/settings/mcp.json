@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "tama96": {
+      "command": "node",
+      "args": [
+        "/Users/ssieger/Documents/projects/tomagatchi/mcp-server/dist/index.js"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "get_status"
+      ]
+    }
+  }
+}
