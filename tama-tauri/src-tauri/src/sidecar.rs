@@ -39,6 +39,36 @@ fn resolve_mcp_server_path() -> String {
     MCP_SERVER_ENTRY.to_string()
 }
 
+/// Write a ready-to-use MCP config snippet to ~/.tama96/mcp_config.json
+/// so users can easily copy it into their AI tool's config.
+pub fn write_mcp_config() {
+    let server_path = resolve_mcp_server_path();
+    let config = serde_json::json!({
+        "mcpServers": {
+            "tama96": {
+                "command": "node",
+                "args": [server_path]
+            }
+        }
+    });
+
+    let config_path = dirs::home_dir()
+        .expect("could not resolve home directory")
+        .join(".tama96")
+        .join("mcp_config.json");
+
+    match serde_json::to_string_pretty(&config) {
+        Ok(json) => {
+            if let Err(e) = std::fs::write(&config_path, json) {
+                eprintln!("[sidecar] failed to write mcp_config.json: {e}");
+            } else {
+                eprintln!("[sidecar] wrote MCP config to {}", config_path.display());
+            }
+        }
+        Err(e) => eprintln!("[sidecar] failed to serialize mcp config: {e}"),
+    }
+}
+
 /// Maximum backoff delay between restart attempts (30 seconds).
 const MAX_BACKOFF_SECS: u64 = 30;
 

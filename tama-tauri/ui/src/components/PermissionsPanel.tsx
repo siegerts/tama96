@@ -118,10 +118,23 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
     <div style={overlayStyle}>
       <div style={panelStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 16, fontFamily: "monospace" }}>Agent Permissions</h2>
+          <h2 style={{ margin: 0, fontSize: 16, fontFamily: "monospace" }}>Settings</h2>
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close settings">✕</button>
         </div>
 
+        {/* MCP Config section */}
+        <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #444" }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: 13, fontFamily: "monospace" }}>Connect an AI tool</h3>
+          <p style={{ fontSize: 11, color: "#999", fontFamily: "monospace", margin: "0 0 8px", lineHeight: 1.5 }}>
+            Copy the config below and paste it into your AI tool's MCP settings
+            (Kiro, Cursor, etc). The app needs to be running for the
+            connection to work.
+          </p>
+          <CopyMcpConfig />
+        </div>
+
+        {/* Agent Permissions */}
+        <h3 style={{ margin: "0 0 6px", fontSize: 13, fontFamily: "monospace" }}>Agent Permissions</h3>
         <p style={{ fontSize: 11, color: "#999", fontFamily: "monospace", margin: "0 0 12px", lineHeight: 1.5 }}>
           Control what the MCP agent can do with your pet.
           When connected via an AI tool, the agent can perform
@@ -185,6 +198,72 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
     </div>
   );
 }
+
+function CopyMcpConfig() {
+  const [config, setConfig] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    invoke<string>("get_mcp_config").then(setConfig).catch(() => setConfig(null));
+  }, []);
+
+  const handleCopy = async () => {
+    if (!config) return;
+    try {
+      await navigator.clipboard.writeText(config);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      const ta = document.createElement("textarea");
+      ta.value = config;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (!config) {
+    return <p style={{ fontSize: 11, color: "#666", fontFamily: "monospace" }}>MCP config not available yet. Restart the app.</p>;
+  }
+
+  return (
+    <div>
+      <pre style={configPreStyle}>{config}</pre>
+      <button onClick={handleCopy} style={copyBtnStyle}>
+        {copied ? "Copied" : "Copy to clipboard"}
+      </button>
+    </div>
+  );
+}
+
+const configPreStyle: React.CSSProperties = {
+  background: "#111",
+  border: "1px solid #444",
+  borderRadius: 4,
+  padding: 8,
+  fontSize: 10,
+  fontFamily: "monospace",
+  color: "#aaa",
+  overflowX: "auto",
+  margin: "0 0 8px",
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-all",
+};
+
+const copyBtnStyle: React.CSSProperties = {
+  padding: "4px 12px",
+  border: "1px solid #555",
+  borderRadius: 4,
+  background: "#2e7d32",
+  color: "#eee",
+  cursor: "pointer",
+  fontSize: 11,
+  fontFamily: "monospace",
+};
 
 const overlayStyle: React.CSSProperties = {
   position: "fixed",

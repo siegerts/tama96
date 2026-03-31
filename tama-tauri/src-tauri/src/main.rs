@@ -82,6 +82,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(shared_pet)
         .manage(shared_perms)
         .invoke_handler(tauri::generate_handler![
@@ -96,6 +97,7 @@ fn main() {
             commands::hatch_new_egg,
             commands::get_permissions,
             commands::update_permissions,
+            commands::get_mcp_config,
         ])
         .setup(move |app| {
             // ── Create main window with transparent titlebar ────────────
@@ -209,6 +211,7 @@ fn main() {
             });
 
             // ── MCP sidecar lifecycle ───────────────────────────────────
+            sidecar::write_mcp_config();
             let sidecar_cancel = Arc::new(AtomicBool::new(false));
             let sidecar_cancel_clone = Arc::clone(&sidecar_cancel);
             tauri::async_runtime::spawn(async move {

@@ -3,6 +3,10 @@ name = "tama-tauri"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "tama96"
+path = "src/main.rs"
+
 [dependencies]
 tama-core = { path = "../../tama-core" }
 serde = { workspace = true }

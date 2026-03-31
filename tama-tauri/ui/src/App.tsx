@@ -3,6 +3,7 @@ import { usePetState } from "./hooks/usePetState";
 import PetDisplay from "./components/PetDisplay";
 import DeathScreen from "./components/DeathScreen";
 import PermissionsPanel from "./components/PermissionsPanel";
+import AboutPanel from "./components/AboutPanel";
 
 const SHELL_COLORS = [
   { name: "Teal", value: "#5b9a9a" },
@@ -35,6 +36,7 @@ function App() {
   } = usePetState();
   const [showSettings, setShowSettings] = useState(false);
   const [showColors, setShowColors] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [shellColor, setShellColor] = useState(loadShellColor);
 
   const pickColor = useCallback((color: string) => {
@@ -86,39 +88,50 @@ function App() {
       )}
 
       <div style={bottomRow}>
-        <div style={{ position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowColors(v => !v); }}
+              style={dotBtn(shellColor)}
+              aria-label="Change shell color"
+              title="Shell color"
+            />
+            {showColors && (
+              <div style={colorPicker} onClick={(e) => e.stopPropagation()}>
+                {SHELL_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => pickColor(c.value)}
+                    style={colorSwatch(c.value, c.value === shellColor)}
+                    aria-label={c.name}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
           <button
-            onClick={(e) => { e.stopPropagation(); setShowColors(v => !v); }}
-            style={dotBtn(shellColor)}
-            aria-label="Change shell color"
-            title="Shell color"
-          />
-          {showColors && (
-            <div style={colorPicker} onClick={(e) => e.stopPropagation()}>
-              {SHELL_COLORS.map((c) => (
-                <button
-                  key={c.value}
-                  onClick={() => pickColor(c.value)}
-                  style={colorSwatch(c.value, c.value === shellColor)}
-                  aria-label={c.name}
-                  title={c.name}
-                />
-              ))}
-            </div>
-          )}
+            onClick={() => setShowSettings(true)}
+            style={cfgStyle}
+            aria-label="Agent permissions"
+            title="Agent Permissions"
+          >
+            settings
+          </button>
         </div>
         <button
-          onClick={() => setShowSettings(true)}
+          onClick={() => setShowAbout(true)}
           style={cfgStyle}
-          aria-label="Agent permissions"
-          title="Agent Permissions"
+          aria-label="About tama96"
+          title="About"
         >
-          settings
+          info
         </button>
       </div>
 
       {showSettings && <PermissionsPanel onClose={() => setShowSettings(false)} />}
-    </div>
+      {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
+    </div >
   );
 }
 
@@ -135,11 +148,13 @@ const shellStyle: React.CSSProperties = {
 const bottomRow: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
+  justifyContent: "space-between",
   gap: 8,
   marginTop: 4,
   marginBottom: 2,
-  alignSelf: "flex-start",
+  width: "100%",
   paddingLeft: 8,
+  paddingRight: 8,
 };
 
 const cfgStyle: React.CSSProperties = {
