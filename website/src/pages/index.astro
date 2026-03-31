@@ -5,11 +5,18 @@ const base = import.meta.env.BASE_URL;
 
 <Base title="tama96 — virtual pet for your desktop">
   <section class="hero">
-    <h1>tama96</h1>
-    <p>A virtual pet for your desktop, terminal, or AI agent. Inspired by the 1996 original. Your care choices shape who your pet becomes.</p>
-    <div class="cta">
-      <a href={`${base}/download`} class="btn-primary">Download</a>
-      <a href={`${base}/docs`} class="btn-secondary">Documentation</a>
+    <div class="hero-split">
+      <div class="hero-text">
+        <h1>tama96</h1>
+        <p>A virtual pet for your desktop, terminal, or AI agent. Inspired by the 1996 original. Your care choices shape who your pet becomes.</p>
+        <div class="cta">
+          <a href={`${base}/download`} class="btn-primary">Download</a>
+          <a href={`${base}/docs`} class="btn-secondary">Documentation</a>
+        </div>
+      </div>
+      <div class="hero-img">
+        <img src={`${base}/tama96-desktop.png`} alt="tama96 desktop app" />
+      </div>
     </div>
   </section>
 
@@ -28,6 +35,19 @@ const base = import.meta.env.BASE_URL;
     </article>
   </section>
 
+  <section class="showcase">
+    <div class="showcase-secondary">
+      <div class="showcase-img">
+        <img src={`${base}/tama96-tui.png`} alt="tama96 terminal TUI" />
+        <span class="img-label">Terminal</span>
+      </div>
+      <div class="showcase-img">
+        <img src={`${base}/tama96-mcp-tools.png`} alt="tama96 MCP tools" />
+        <span class="img-label">MCP agent</span>
+      </div>
+    </div>
+  </section>
+
   <section class="evo">
     <h2>Evolution</h2>
     <p>Real-time lifecycle. One day equals one pet year. Hunger and happiness decay, poop accumulates, sickness sets in. How you respond determines which of 11 characters your pet becomes.</p>
@@ -39,20 +59,33 @@ const base = import.meta.env.BASE_URL;
     .hero {
       padding: 48px 0 56px;
     }
-    .hero h1 {
+    .hero-split {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+    }
+    .hero-text { flex: 1; }
+    .hero-text h1 {
       font-family: 'JetBrains Mono', monospace;
       font-size: 42px;
       font-weight: 700;
       letter-spacing: -0.04em;
       margin-bottom: 16px;
     }
-    .hero p {
+    .hero-text p {
       font-size: 17px;
       color: var(--text-secondary);
       line-height: 1.75;
       max-width: 520px;
       margin-bottom: 32px;
     }
+    .hero-img {
+      flex-shrink: 0;
+      width: 240px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .hero-img img { width: 100%; display: block; }
     .cta { display: flex; gap: 12px; }
     .btn-primary {
       display: inline-flex;
@@ -104,7 +137,49 @@ const base = import.meta.env.BASE_URL;
       color: var(--text-secondary);
       line-height: 1.65;
     }
+    .screenshot {
+      width: 100%;
+      margin-top: 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
 
+    .showcase { margin-bottom: 64px; }
+    .showcase-secondary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .showcase-img {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #1e1e1e;
+      position: relative;
+      aspect-ratio: 4 / 3;
+    }
+    .showcase-img img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      object-position: top left;
+    }
+    .img-label {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #ccc;
+      background: rgba(0,0,0,0.6);
+      padding: 3px 10px;
+      border-radius: 4px;
+      backdrop-filter: blur(4px);
+    }
+    @media (max-width: 640px) {
+      .showcase-secondary { grid-template-columns: 1fr; }
+    }
     .evo {
       padding-top: 32px;
       border-top: 1px solid var(--border);
@@ -131,8 +206,11 @@ const base = import.meta.env.BASE_URL;
     .small { font-size: 13px; color: var(--text-tertiary); }
 
     @media (max-width: 640px) {
+      .hero-split { flex-direction: column; gap: 24px; }
+      .hero-img { width: 200px; }
       .grid { grid-template-columns: 1fr; }
-      .hero h1 { font-size: 32px; }
+      .hero-text h1 { font-size: 32px; }
+      .showcase-secondary { grid-template-columns: 1fr; }
     }
   </style>
 </Base>
