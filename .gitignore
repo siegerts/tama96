@@ -19,6 +19,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+.kiro/settings/
 
 # App data
 .tama96/
