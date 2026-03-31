@@ -183,7 +183,7 @@ Everything lives in `~/.tama96/`:
 
 ## Disclaimer
 
-This is an independent hobby project. It is not affiliated with, endorsed by, or connected to Bandai Co., Ltd. in any way. "Tamagotchi" is a registered trademark of Bandai. This project is a clean-room reimplementation inspired by the original gameplay mechanics — no original code, assets, or ROM data from Bandai products were used.
+This is an independent hobby project. It is not affiliated with, endorsed by, or connected to Bandai Co., Ltd. in any way. "Tamagotchi" is a registered trademark of Bandai. No original Bandai code, assets, or ROM data were used. Gameplay mechanics were referenced from publicly available wiki documentation.
 
 ## License
 
