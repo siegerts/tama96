@@ -1,0 +1,101 @@
+---
+import Base from '../layouts/Base.astro';
+const repo = 'https://github.com/siegerts/tama96/releases/latest';
+---
+
+<Base title="tama96 - Download">
+  <h1>Download</h1>
+  <p class="intro">Grab the latest release for your platform.</p>
+
+  <h2>Desktop app</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">macOS</div>
+      <p>Apple Silicon + Intel</p>
+      <a href={repo} class="dl">Download .dmg</a>
+    </div>
+    <div class="card">
+      <div class="card-title">Windows</div>
+      <p>64-bit installer</p>
+      <a href={repo} class="dl">Download .msi</a>
+    </div>
+    <div class="card">
+      <div class="card-title">Linux</div>
+      <p>.deb and .AppImage</p>
+      <a href={repo} class="dl">Download</a>
+    </div>
+  </div>
+
+  <h2>Terminal (TUI)</h2>
+  <p class="desc">Standalone binary, no dependencies.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">macOS (Apple Silicon)</div>
+      <a href={`${repo}/download/tama-tui-aarch64-apple-darwin`} class="dl">Download</a>
+    </div>
+    <div class="card">
+      <div class="card-title">macOS (Intel)</div>
+      <a href={`${repo}/download/tama-tui-x86_64-apple-darwin`} class="dl">Download</a>
+    </div>
+    <div class="card">
+      <div class="card-title">Linux (x64)</div>
+      <a href={`${repo}/download/tama-tui-x86_64-unknown-linux-gnu`} class="dl">Download</a>
+    </div>
+  </div>
+  <p class="note">On macOS/Linux, make it executable: <code>chmod +x tama-tui-*</code></p>
+  <p class="note">Or build from source: <code>cargo install --git https://github.com/siegerts/tama96 tama-tui</code></p>
+
+  <h2>Requirements</h2>
+  <ul>
+    <li>The MCP server requires <a href="https://nodejs.org">Node.js</a> 18+</li>
+    <li>The desktop app includes everything else</li>
+    <li>The TUI is a single binary with zero dependencies</li>
+  </ul>
+
+  <style>
+    h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px; }
+    .intro { color: var(--text-secondary); margin-bottom: 36px; }
+    h2 { font-size: 17px; font-weight: 600; margin-bottom: 14px; }
+    .desc { color: var(--text-secondary); font-size: 14px; margin: -6px 0 14px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; }
+    .card p { font-size: 13px; color: var(--text-tertiary); }
+    .dl {
+      display: inline-block;
+      margin-top: auto;
+      padding: 7px 16px;
+      background: #2d3320;
+      color: #c4cfa1;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .dl:hover { background: #3d4530; text-decoration: none; }
+    .note { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
+    ul { list-style: none; padding: 0; }
+    li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding: 3px 0 3px 18px;
+      position: relative;
+    }
+    li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 11px;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #8a9470;
+    }
+    @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</Base>

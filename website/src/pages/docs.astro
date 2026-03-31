@@ -1,0 +1,113 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="tama96 - Docs">
+  <h1>Docs</h1>
+
+  <section>
+    <h2>How it works</h2>
+    <p>Your pet lives in real time. Every minute the simulation ticks. Hunger and happiness decay, poop accumulates, sickness can set in. One real day equals one pet year. Leave your pet alone too long and it dies. Take good care of it and it evolves into a better character.</p>
+  </section>
+
+  <section>
+    <h2>LCD icons</h2>
+    <p>The LCD screen has two rows of icons you can click (or use keyboard shortcuts in the TUI).</p>
+    <h3>Top row</h3>
+    <table><thead><tr><th>Icon</th><th>Name</th><th>What it does</th></tr></thead><tbody>
+      <tr><td>Fork/knife</td><td>Feed</td><td>Meal restores 1 hunger (+1 weight). Snack restores 1 happiness (+2 weight). Can't feed a sick pet.</td></tr>
+      <tr><td>Diamond</td><td>Light</td><td>Toggle lights. Turn off at bedtime so your pet can sleep.</td></tr>
+      <tr><td>Ball</td><td>Game</td><td>5-round guessing game. Win 3+ to gain 1 happiness. Burns 1 weight.</td></tr>
+      <tr><td>Cross</td><td>Medicine</td><td>2 doses to cure sickness. Only works when sick.</td></tr>
+    </tbody></table>
+    <h3>Bottom row</h3>
+    <table><thead><tr><th>Icon</th><th>Name</th><th>What it does</th></tr></thead><tbody>
+      <tr><td>Bathtub</td><td>Clean</td><td>Removes one poop. 4+ poops makes your pet sick.</td></tr>
+      <tr><td>Meter</td><td>Stats</td><td>Shows hunger, happiness, weight. Info only.</td></tr>
+      <tr><td>Person</td><td>Discipline</td><td>Scold when a discipline call appears (~10% chance per tick, 15min deadline).</td></tr>
+      <tr><td>!</td><td>Attention</td><td>Shows what needs attention. Info only.</td></tr>
+    </tbody></table>
+  </section>
+
+  <section>
+    <h2>Meters</h2>
+    <p>Hunger and happiness each have 4 hearts. They decay at rates that depend on your character. When either hits 0, a 15-minute care deadline starts. Miss it and you get a care mistake.</p>
+    <p>Discipline is 0-100%. Goes up 25% each time you successfully discipline.</p>
+  </section>
+
+  <section>
+    <h2>Sickness</h2>
+    <p>Your pet gets sick from too much poop (4+) or overfeeding snacks as a baby (3+). A sick pet can't eat or play. Give 2 doses of medicine to cure it.</p>
+  </section>
+
+  <section>
+    <h2>Death</h2>
+    <p>Your pet can die from old age, neglect (hunger AND happiness at 0 for 12+ hours), untreated sickness, or baby snack overfeeding (5+). Hatch a new egg from the death screen.</p>
+  </section>
+
+  <section>
+    <h2>Sleep</h2>
+    <p>Each character has a bedtime and wake time. Turn lights off at bedtime. At wake time, age increments by 1.</p>
+  </section>
+
+  <section>
+    <h2>Evolution</h2>
+    <pre>Egg (5min) → Babytchi (65min) → Marutchi (age 3) → Teen (age 6) → Adult
+
+Teen: care_mistakes 0-2 → Tamatchi, 3+ → Kuchitamatchi
+Adult: full P1 matrix based on teen char, type, care + discipline mistakes
+Best care → Mametchi · Worst care → Tarakotchi
+Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
+  </section>
+
+  <section>
+    <h2>MCP / AI agent</h2>
+    <p>The desktop app bundles an MCP server that AI tools can connect to. Open settings in the app and click "Copy to clipboard" to get the config for your AI tool.</p>
+    <p>Agent permissions are configurable per-action with rate limits. The master switch disables all agent access.</p>
+  </section>
+
+  <section>
+    <h2>TUI keyboard shortcuts</h2>
+    <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
+      <tr><td><code>f</code></td><td>Feed (then m for meal, s for snack)</td></tr>
+      <tr><td><code>g</code></td><td>Play game</td></tr>
+      <tr><td><code>d</code></td><td>Discipline</td></tr>
+      <tr><td><code>c</code></td><td>Clean poop</td></tr>
+      <tr><td><code>l</code></td><td>Toggle lights</td></tr>
+      <tr><td><code>i</code></td><td>Give medicine</td></tr>
+      <tr><td><code>a</code></td><td>About</td></tr>
+      <tr><td><code>q</code></td><td>Quit</td></tr>
+    </tbody></table>
+    <p>If the desktop app is running, the TUI enters client mode automatically.</p>
+  </section>
+
+  <section>
+    <h2>Data directory</h2>
+    <p>Everything lives in <code>~/.tama96/</code></p>
+    <table><thead><tr><th>File</th><th>Purpose</th></tr></thead><tbody>
+      <tr><td><code>state.json</code></td><td>Pet state</td></tr>
+      <tr><td><code>permissions.json</code></td><td>Agent permission config</td></tr>
+      <tr><td><code>mcp_config.json</code></td><td>Ready-to-copy MCP config</td></tr>
+      <tr><td><code>mcp_port</code></td><td>TCP port for MCP bridge</td></tr>
+      <tr><td><code>tama96.lock</code></td><td>Single-instance lockfile</td></tr>
+    </tbody></table>
+  </section>
+
+  <style>
+    h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 36px; }
+    section { margin-bottom: 36px; }
+    h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 10px; }
+    h3 { font-size: 14px; font-weight: 500; color: #8a9470; margin: 14px 0 8px; }
+    p { color: var(--text-secondary); margin-bottom: 10px; font-size: 14px; line-height: 1.7; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
+    thead th {
+      text-align: left; padding: 8px 12px; font-weight: 500;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-tertiary); border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 12px; color: var(--text-secondary);
+      border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5;
+    }
+  </style>
+</Base>

@@ -1,0 +1,138 @@
+---
+import Base from '../layouts/Base.astro';
+const base = import.meta.env.BASE_URL;
+---
+
+<Base title="tama96 — virtual pet for your desktop">
+  <section class="hero">
+    <h1>tama96</h1>
+    <p>A virtual pet for your desktop, terminal, or AI agent. Inspired by the 1996 original. Your care choices shape who your pet becomes.</p>
+    <div class="cta">
+      <a href={`${base}/download`} class="btn-primary">Download</a>
+      <a href={`${base}/docs`} class="btn-secondary">Documentation</a>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article>
+      <h3>Desktop app</h3>
+      <p>Pixel LCD display with clickable icons. System tray, background ticks, desktop notifications. Always-on-top so your pet stays visible.</p>
+    </article>
+    <article>
+      <h3>Terminal</h3>
+      <p>Braille pixel sprites rendered in your terminal. Runs standalone or connects to the desktop app as a client. Single binary, zero dependencies.</p>
+    </article>
+    <article>
+      <h3>AI agent</h3>
+      <p>Bundled MCP server lets AI tools feed, play with, and care for your pet. Per-action permissions and rate limits keep things under control.</p>
+    </article>
+  </section>
+
+  <section class="evo">
+    <h2>Evolution</h2>
+    <p>Real-time lifecycle. One day equals one pet year. Hunger and happiness decay, poop accumulates, sickness sets in. How you respond determines which of 11 characters your pet becomes.</p>
+    <div class="chain">Egg → Baby → Child → Teen → Adult</div>
+    <p class="small">Best care leads to Mametchi. Neglect leads to Tarakotchi. <a href={`${base}/docs`}>Full evolution chart in the docs.</a></p>
+  </section>
+
+  <style>
+    .hero {
+      padding: 48px 0 56px;
+    }
+    .hero h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 17px;
+      color: var(--text-secondary);
+      line-height: 1.75;
+      max-width: 520px;
+      margin-bottom: 32px;
+    }
+    .cta { display: flex; gap: 12px; }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      padding: 10px 24px;
+      background: var(--text);
+      color: var(--bg);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.8; text-decoration: none; }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      padding: 10px 24px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover { border-color: #999; color: var(--text); text-decoration: none; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 64px;
+    }
+    .grid article {
+      background: var(--bg);
+      padding: 28px;
+    }
+    .grid h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+    .grid p {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    .evo {
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    .evo h2 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .evo p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .chain {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      color: var(--text);
+      letter-spacing: 0.02em;
+      margin-bottom: 12px;
+    }
+    .small { font-size: 13px; color: var(--text-tertiary); }
+
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 32px; }
+    }
+  </style>
+</Base>
