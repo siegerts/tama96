@@ -67,6 +67,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ matrix.platform == 'macos-latest' && '-' || '' }}
         with:
           projectPath: tama-tauri
           tagName: ${{ github.ref_name }}
@@ -109,6 +110,10 @@ jobs:
 
       - name: Build TUI
         run: cargo build --release --target ${{ matrix.target }} -p tama-tui
+
+      - name: Sign binary (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: codesign --force --sign - "target/${{ matrix.target }}/release/${{ matrix.binary }}"
 
       - name: Package binary (unix)
         if: matrix.platform != 'windows-latest'
