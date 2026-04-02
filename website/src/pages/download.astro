@@ -13,24 +13,28 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     <div class="cards">
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Apple Silicon)</div>
-        <a href={`${dl}/tama96_0.1.0_aarch64.dmg`} class="dl">Download .dmg</a>
+        <span class="card-hint">aarch64.dmg</span>
+        <a href={`${dl}/tama96_0.1.10_aarch64.dmg`} class="dl">Download .dmg</a>
       </div>
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Intel)</div>
-        <a href={`${dl}/tama96_0.1.0_x64.dmg`} class="dl">Download .dmg</a>
+        <span class="card-hint">x64.dmg</span>
+        <a href={`${dl}/tama96_0.1.10_x64.dmg`} class="dl">Download .dmg</a>
       </div>
       <div class="card" data-platform="windows">
         <div class="card-title">Windows</div>
-        <p>64-bit installer</p>
-        <a href={`${dl}/tama96_0.1.0_x64-setup.exe`} class="dl">Download .exe</a>
+        <span class="card-hint">x64-setup.exe</span>
+        <a href={`${dl}/tama96_0.1.10_x64-setup.exe`} class="dl">Download .exe</a>
       </div>
       <div class="card" data-platform="linux">
         <div class="card-title">Linux (deb)</div>
-        <a href={`${dl}/tama96_0.1.0_amd64.deb`} class="dl">Download .deb</a>
+        <span class="card-hint">amd64.deb</span>
+        <a href={`${dl}/tama96_0.1.10_amd64.deb`} class="dl">Download .deb</a>
       </div>
       <div class="card" data-platform="linux">
         <div class="card-title">Linux (AppImage)</div>
-        <a href={`${dl}/tama96_0.1.0_amd64.AppImage`} class="dl">Download .AppImage</a>
+        <span class="card-hint">amd64.AppImage</span>
+        <a href={`${dl}/tama96_0.1.10_amd64.AppImage`} class="dl">Download .AppImage</a>
       </div>
     </div>
 
@@ -38,22 +42,26 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     <div class="cards">
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Apple Silicon)</div>
+        <span class="card-hint">aarch64-apple-darwin</span>
         <a href={`${dl}/tama-tui-aarch64-apple-darwin.tar.gz`} class="dl">Download .tar.gz</a>
       </div>
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Intel)</div>
+        <span class="card-hint">x86_64-apple-darwin</span>
         <a href={`${dl}/tama-tui-x86_64-apple-darwin.tar.gz`} class="dl">Download .tar.gz</a>
       </div>
       <div class="card" data-platform="linux">
         <div class="card-title">Linux (x64)</div>
+        <span class="card-hint">x86_64-unknown-linux-gnu</span>
         <a href={`${dl}/tama-tui-x86_64-unknown-linux-gnu.tar.gz`} class="dl">Download .tar.gz</a>
       </div>
       <div class="card" data-platform="windows">
         <div class="card-title">Windows (x64)</div>
+        <span class="card-hint">x86_64-pc-windows-msvc</span>
         <a href={`${dl}/tama-tui-x86_64-pc-windows-msvc.zip`} class="dl">Download .zip</a>
       </div>
     </div>
-    <p class="note mac-hint" data-platform="mac">macOS may block unsigned apps. After installing, run: <code>xattr -cr /Applications/tama96.app</code></p>
+    <p class="note mac-hint" data-platform="mac">macOS may block unsigned apps — see FAQ below.</p>
     <p class="note tui-hint" data-platform-hide="windows">Extract and run: <code>tar xzf tama-tui-*.tar.gz && ./tama-tui</code></p>
   </section>
 
@@ -69,6 +77,22 @@ const releases = 'https://github.com/siegerts/tama96/releases';
     <li>The desktop app includes everything else</li>
     <li>The TUI is a single binary with zero dependencies</li>
   </ul>
+
+  <h2>FAQ</h2>
+  <details class="faq" open>
+    <summary>macOS says "Apple could not verify" — what do I do?</summary>
+    <p>This is normal for apps that aren't notarized through Apple's developer program. To open tama96:</p>
+    <ol>
+      <li>Click <strong>Done</strong> to dismiss the dialog</li>
+      <li>Open <strong>System Settings → Privacy & Security</strong></li>
+      <li>Scroll down — you'll see <em>"tama96" was blocked from use because it is not from an identified developer</em></li>
+      <li>Click <strong>Open Anyway</strong></li>
+      <li>Authenticate with your password or Touch ID</li>
+    </ol>
+    <p>Alternatively, run this in Terminal before opening the app:</p>
+    <pre><code>xattr -cr /Applications/tama96.app</code></pre>
+    <p>You only need to do this once — macOS will remember your choice.</p>
+  </details>
 
   <script>
     const ua = navigator.userAgent;
@@ -112,6 +136,7 @@ const releases = 'https://github.com/siegerts/tama96/releases';
       gap: 6px;
     }
     .card-title { font-size: 14px; font-weight: 600; }
+    .card-hint { font-size: 11px; color: var(--text-tertiary); font-family: monospace; }
     .card p { font-size: 13px; color: var(--text-tertiary); }
     .dl {
       display: inline-block;
@@ -134,6 +159,14 @@ const releases = 'https://github.com/siegerts/tama96/releases';
       margin-bottom: 16px;
     }
     summary:hover { color: var(--text-primary); }
+    .faq { margin-bottom: 16px; }
+    .faq summary { font-size: 14px; font-weight: 500; color: var(--text-primary); margin-bottom: 10px; }
+    .faq p, .faq ol { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+    .faq ol { padding-left: 20px; }
+    .faq li { padding: 2px 0; }
+    .faq li::before { display: none; }
+    .faq pre { margin: 8px 0; }
+    .faq pre code { background: none; padding: 0; font-size: 13px; }
     ul { list-style: none; padding: 0; }
     li {
       font-size: 14px;

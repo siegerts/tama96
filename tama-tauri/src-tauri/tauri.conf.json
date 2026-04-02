@@ -1,6 +1,6 @@
 {
   "productName": "tama96",
-  "version": "0.1.0",
+  "version": "0.1.10",
   "identifier": "com.tama96.desktop",
   "build": {
     "frontendDist": "../ui/dist",
