@@ -142,6 +142,7 @@ const shellStyle: React.CSSProperties = {
   flexDirection: "column",
   alignItems: "center",
   padding: "6px",
+  boxSizing: "border-box",
   overflow: "hidden",
 };
 

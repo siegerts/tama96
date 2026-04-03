@@ -110,6 +110,9 @@ fn status_indicators(state: &PetState) -> String {
     if state.poop_count > 0 {
         parts.push(format!("POOP:{}", "o".repeat(state.poop_count as usize)));
     }
+    if state.pending_lights_deadline.is_some() {
+        parts.push("BEDTIME".to_string());
+    }
     if state.is_sick { parts.push("SICK".to_string()); }
     if state.is_sleeping { parts.push("ZZZ".to_string()); }
     if parts.is_empty() { String::new() } else { parts.join(" ") }
@@ -268,7 +271,13 @@ fn render_ui(
         match input_mode {
             InputMode::Feed => "Feed: [m]eal or [s]nack? (Esc to cancel)".to_string(),
             InputMode::About => "Press Esc to close".to_string(),
-            InputMode::Normal => "f:feed  g:game  d:discipline  c:clean  l:lights  i:med  a:about  q:quit".to_string(),
+            InputMode::Normal => {
+                if state.pending_lights_deadline.is_some() {
+                    "BEDTIME: press l to turn the lights off".to_string()
+                } else {
+                    "f:feed  g:game  d:discipline  c:clean  l:lights  i:med  a:about  q:quit".to_string()
+                }
+            }
         }
     };
     let hints = Paragraph::new(hints_text)

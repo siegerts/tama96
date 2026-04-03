@@ -16,7 +16,7 @@ import Base from '../layouts/Base.astro';
     <h3>Top row</h3>
     <table><thead><tr><th>Icon</th><th>Name</th><th>What it does</th></tr></thead><tbody>
       <tr><td>Fork/knife</td><td>Feed</td><td>Meal restores 1 hunger (+1 weight). Snack restores 1 happiness (+2 weight). Can't feed a sick pet.</td></tr>
-      <tr><td>Diamond</td><td>Light</td><td>Toggle lights. Turn off at bedtime so your pet can sleep.</td></tr>
+      <tr><td>Diamond</td><td>Light</td><td>Toggle lights. The desktop info strip shows the next bedtime, and bedtime starts with a lights-off warning.</td></tr>
       <tr><td>Ball</td><td>Game</td><td>5-round guessing game. Win 3+ to gain 1 happiness. Burns 1 weight.</td></tr>
       <tr><td>Cross</td><td>Medicine</td><td>2 doses to cure sickness. Only works when sick.</td></tr>
     </tbody></table>
@@ -25,7 +25,7 @@ import Base from '../layouts/Base.astro';
       <tr><td>Bathtub</td><td>Clean</td><td>Removes one poop. 4+ poops makes your pet sick.</td></tr>
       <tr><td>Meter</td><td>Stats</td><td>Shows hunger, happiness, weight. Info only.</td></tr>
       <tr><td>Person</td><td>Discipline</td><td>Scold when a discipline call appears (~10% chance per tick, 15min deadline).</td></tr>
-      <tr><td>!</td><td>Attention</td><td>Shows what needs attention. Info only.</td></tr>
+      <tr><td>!</td><td>Attention</td><td>Shows what needs attention: bedtime/lights, sickness, poop, or discipline. Info only.</td></tr>
     </tbody></table>
   </section>
 
@@ -47,7 +47,9 @@ import Base from '../layouts/Base.astro';
 
   <section>
     <h2>Sleep</h2>
-    <p>Each character has a bedtime and wake time. Turn lights off at bedtime. At wake time, age increments by 1.</p>
+    <p>Each character has a bedtime and wake time. When bedtime hits, you have a 15-minute window to turn the lights off. Once the pet is asleep, decay pauses. At wake time, age increments by 1.</p>
+    <p>That wake-time age increase is what moves the pet toward later stages, so bedtime matters for evolution as well as care.</p>
+    <p>The desktop app shows bedtime cues in the info strip below the LCD, including the next bedtime and active lights deadlines. The TUI shows <code>BEDTIME</code> in the status/help line when lights need attention.</p>
   </section>
 
   <section>
@@ -78,7 +80,7 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
       <tr><td><code>a</code></td><td>About</td></tr>
       <tr><td><code>q</code></td><td>Quit</td></tr>
     </tbody></table>
-    <p>If the desktop app is running, the TUI enters client mode automatically.</p>
+    <p>If the desktop app is running, the TUI enters client mode automatically. When bedtime starts, the status area shows <code>BEDTIME</code> so you know to press <code>l</code>.</p>
   </section>
 
   <section>

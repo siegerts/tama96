@@ -31,7 +31,7 @@ The LCD screen has two rows of icons you can click (or tap the keyboard shortcut
 | Icon | Name | What it does |
 |------|------|-------------|
 | Fork/knife | Feed | Opens a submenu: Meal restores 1 hunger heart (+1 weight), Snack restores 1 happiness heart (+2 weight). Can't feed a sick pet. |
-| Diamond | Light | Toggles lights on/off. Turn lights off at bedtime so your pet can sleep. If you leave them on too long after bedtime, you get a care mistake. |
+| Diamond | Light | Toggles lights on/off. The desktop info strip shows the next bedtime, and bedtime starts with a lights-off warning. Turn lights off so your pet can sleep. If you leave them on too long after bedtime, you get a care mistake. |
 | Ball | Game | Plays a left/right guessing game (5 rounds, random). Win 3+ rounds to gain 1 happiness heart. Also burns 1 weight. |
 | Cross | Medicine | Gives one dose of medicine. Takes 2 doses to cure sickness. Only works when the pet is actually sick. |
 
@@ -42,7 +42,7 @@ The LCD screen has two rows of icons you can click (or tap the keyboard shortcut
 | Bathtub | Clean | Removes one poop. Poop accumulates over time based on your character's poop interval. 4+ poops makes your pet sick. |
 | Meter | Stats | Shows current hunger, happiness, and weight. Just an info check, no action. |
 | Person | Discipline | Scolds your pet when it's acting out. A discipline call appears randomly (~10% chance per tick) with a 15-minute deadline. Miss it and you get a discipline mistake. More discipline = better evolution outcomes. |
-| Exclamation | Attention | Shows what needs your attention right now — sick, poop, pending discipline call. Another info-only button. |
+| Exclamation | Attention | Shows what needs your attention right now — bedtime/lights, sickness, poop, or a pending discipline call. Another info-only button. |
 
 ### Meters and hearts
 
@@ -74,6 +74,9 @@ Each character has a bedtime and wake time. When bedtime hits:
 1. If lights are on, you get a 15-minute window to turn them off
 2. Once lights are off, the pet sleeps (no decay, no actions)
 3. At wake time, the pet wakes up and age increments by 1
+4. The desktop app now shows a bedtime countdown plus active lights deadlines in the info strip, and the TUI shows `BEDTIME` in the status/help line when lights need attention
+
+That wake-time age increase is what moves your pet toward later stages. If the pet never gets to sleep, it never gets the next wake-up age tick.
 
 ## Evolution
 
@@ -136,7 +139,7 @@ cd tama-tauri && npx @tauri-apps/cli dev
 
 The app lives in the system tray when you close the window. Your pet keeps ticking in the background. Notifications fire on hunger/happiness hitting zero, evolution, and death.
 
-Click the LCD icons directly to interact. Hover for tooltips. The info line below the LCD shows your pet's name, age, and weight — hover it for detailed timing info (next hunger drop, next poop, evolution countdown).
+Click the LCD icons directly to interact. Hover for tooltips. The info line below the LCD shows your pet's name, age, and weight, plus sleep cues like the next bedtime or an active lights-off deadline. Hover it for detailed timing info (bedtime, wake/age reminder, next hunger drop, next poop, evolution countdown).
 
 ### Terminal app (TUI)
 
@@ -144,7 +147,7 @@ Click the LCD icons directly to interact. Hover for tooltips. The info line belo
 cargo run -p tama-tui
 ```
 
-If the desktop app is already running, the TUI enters client mode automatically — it shows your pet's state and sends actions to the app over the network. No simulation conflicts.
+If the desktop app is already running, the TUI enters client mode automatically — it shows your pet's state and sends actions to the app over the network. No simulation conflicts. When bedtime starts, the TUI status area shows `BEDTIME` so you know to press `l`.
 
 | Key | Action |
 |-----|--------|

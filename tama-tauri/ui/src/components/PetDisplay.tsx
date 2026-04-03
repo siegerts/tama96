@@ -224,6 +224,7 @@ export default function PetDisplay({
   const [feedSubmenu, setFeedSubmenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animFrame, setAnimFrame] = useState(0);
+  const lastLightsDeadlineRef = useRef<string | null>(null);
 
   const px = PX;
   const canvasW = 40 * px;
@@ -251,6 +252,18 @@ export default function PetDisplay({
     setToast(msg);
     setTimeout(() => setToast(null), 1500);
   }, []);
+
+  useEffect(() => {
+    if (
+      state.pending_lights_deadline
+      && state.pending_lights_deadline !== lastLightsDeadlineRef.current
+    ) {
+      showToast("Bedtime! Lights off in 15m");
+    }
+    lastLightsDeadlineRef.current = state.pending_lights_deadline;
+  }, [state.pending_lights_deadline, showToast]);
+
+  const sleepStatus = getSleepStatus(state);
 
   // Handle icon clicks
   const handleCanvasClick = useCallback(async (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -299,10 +312,11 @@ export default function PetDisplay({
             showToast("Disciplined!");
           } else if (i === 3) { // Attention — no action, just info
             const msgs: string[] = [];
+            if (state.pending_lights_deadline) msgs.push("BEDTIME");
             if (state.is_sick) msgs.push("SICK");
             if (state.poop_count > 0) msgs.push("POOP");
             if (state.pending_discipline_deadline) msgs.push("DISCIPLINE");
-            showToast(msgs.length ? msgs.join(" ") : "All good!");
+            showToast(msgs.length ? msgs.join(" ") : sleepStatus.summary);
           }
         } catch (err) { showToast(String(err)); }
         return;
@@ -311,7 +325,7 @@ export default function PetDisplay({
 
     // Click elsewhere closes feed submenu
     setFeedSubmenu(false);
-  }, [canvasW, canvasH, bottomIconY, px, state, toggleLights, playGame, giveMedicine, cleanPoop, discipline, showToast]);
+  }, [canvasW, canvasH, bottomIconY, px, state, toggleLights, playGame, giveMedicine, cleanPoop, discipline, showToast, sleepStatus.summary]);
 
   // Handle hover for cursor + tooltip
   const handleCanvasMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -409,7 +423,13 @@ export default function PetDisplay({
 
   // Tooltip text
   const tooltipText = hoverIcon
-    ? (hoverIcon.row === "top" ? TOP_LABELS : BOTTOM_LABELS)[hoverIcon.index]
+    ? (
+      hoverIcon.row === "top"
+        ? (hoverIcon.index === 1 ? sleepStatus.summary : TOP_LABELS[hoverIcon.index])
+        : (hoverIcon.index === 3 && state.pending_lights_deadline
+          ? "Bedtime alert"
+          : BOTTOM_LABELS[hoverIcon.index])
+    )
     : null;
 
   return (
@@ -485,12 +505,82 @@ const EVOLUTION_INFO: Record<string, { ageThreshold?: number; minutesThreshold?:
   Teen: { ageThreshold: 6, label: "Adult" },
 };
 
+type SleepTone = "neutral" | "normal" | "alert" | "sleep";
+
+function minutesUntilHour(hour: number, now: Date): number {
+  const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const targetMinutes = hour * 60;
+  let diff = targetMinutes - currentMinutes;
+  if (diff < 0) diff += 24 * 60;
+  return diff;
+}
+
 function formatMinutes(mins: number): string {
   if (mins <= 0) return "soon";
   if (mins < 60) return `${Math.round(mins)}m`;
   const h = Math.floor(mins / 60);
   const m = Math.round(mins % 60);
   return m > 0 ? `${h}h${m}m` : `${h}h`;
+}
+
+function formatCountdown(prefix: string, mins: number): string {
+  return mins <= 0 ? `${prefix} now` : `${prefix} ${formatMinutes(mins)}`;
+}
+
+function getSleepStatus(
+  state: PetState,
+  nowMs: number = Date.now(),
+): { summary: string; hint: string; detail: string; tone: SleepTone } {
+  if (state.stage === "Egg") {
+    return {
+      summary: "No bedtime yet",
+      hint: "Sleep starts after hatch",
+      detail: "Age starts after hatch",
+      tone: "neutral",
+    };
+  }
+
+  const stats = CHAR_STATS[state.character];
+  if (!stats) {
+    return {
+      summary: "Sleep unknown",
+      hint: "Sleep timing unavailable",
+      detail: "Age +1 on wake",
+      tone: "neutral",
+    };
+  }
+
+  const now = new Date(nowMs);
+  const wakeIn = minutesUntilHour(stats.wakeHour, now);
+  const bedtimeIn = minutesUntilHour(stats.sleepHour, now);
+
+  if (state.is_sleeping) {
+    return {
+      summary: formatCountdown("Wake", wakeIn),
+      hint: `Sleeping now. ${formatCountdown("Wake", wakeIn)}`,
+      detail: "Age +1 on wake",
+      tone: "sleep",
+    };
+  }
+
+  if (state.pending_lights_deadline) {
+    const remaining = (new Date(state.pending_lights_deadline).getTime() - nowMs) / 60000;
+    return {
+      summary: remaining <= 0 ? "Lights off now" : `Lights off ${formatMinutes(remaining)}`,
+      hint: remaining <= 0
+        ? "Bedtime now. Turn lights off."
+        : `Bedtime now. Lights off in ${formatMinutes(remaining)}`,
+      detail: "Age +1 on wake",
+      tone: "alert",
+    };
+  }
+
+  return {
+    summary: formatCountdown("Bed", bedtimeIn),
+    hint: `Next bedtime in ${formatMinutes(bedtimeIn)}`,
+    detail: "Age +1 on wake",
+    tone: "normal",
+  };
 }
 
 function InfoPanel({ state }: { state: PetState }) {
@@ -500,6 +590,7 @@ function InfoPanel({ state }: { state: PetState }) {
   const stageStart = new Date(state.stage_start_time).getTime();
   const lastPoop = new Date(state.last_poop_time).getTime();
   const elapsedSinceTick = (now - lastTick) / 60000; // minutes
+  const sleepStatus = getSleepStatus(state, now);
 
   // Time until next hunger drop
   const hungerRemaining = stats ? Math.max(0, stats.hungerDecay - elapsedSinceTick) : 0;
@@ -534,9 +625,15 @@ function InfoPanel({ state }: { state: PetState }) {
     const remaining = (new Date(state.pending_discipline_deadline).getTime() - now) / 60000;
     if (remaining > 0) deadlines.push(`Disc: ${formatMinutes(remaining)}`);
   }
+  if (state.pending_lights_deadline) {
+    const remaining = (new Date(state.pending_lights_deadline).getTime() - now) / 60000;
+    if (remaining > 0) deadlines.push(`Lights: ${formatMinutes(remaining)}`);
+  }
 
   // Build tooltip lines
   const tipLines: string[] = [
+    sleepStatus.hint,
+    sleepStatus.detail,
     `-hunger ${formatMinutes(hungerRemaining)}`,
     `+poop ${formatMinutes(poopRemaining)}`,
   ];
@@ -557,6 +654,10 @@ function InfoPanel({ state }: { state: PetState }) {
         <span>{state.character}</span>
         <span>age {state.age}</span>
         <span>wt {state.weight}</span>
+      </div>
+      <div style={infoMetaRow}>
+        <span style={infoChipStyle(sleepStatus.tone)}>{sleepStatus.summary}</span>
+        <span style={infoChipStyle("neutral")}>{sleepStatus.detail}</span>
       </div>
       {showTip && (
         <div style={infoTipStyle}>
@@ -611,12 +712,36 @@ const infoPanelStyle: React.CSSProperties = {
 const infoMainRow: React.CSSProperties = {
   display: "flex", justifyContent: "center", gap: 10,
   fontSize: 12, fontFamily: "monospace", color: "#444",
-  letterSpacing: 0.5,
+  letterSpacing: 0.5, fontVariantNumeric: "tabular-nums",
 };
+
+const infoMetaRow: React.CSSProperties = {
+  display: "flex", justifyContent: "center", flexWrap: "wrap",
+  gap: 6, marginTop: 4, maxWidth: "100%",
+};
+
+const infoChipStyle = (tone: SleepTone): React.CSSProperties => ({
+  background: tone === "alert"
+    ? "#3d2616"
+    : tone === "sleep"
+      ? "#223047"
+      : "#00000012",
+  color: tone === "alert"
+    ? "#f2c48f"
+    : tone === "sleep"
+      ? "#c2d7ff"
+      : "#4a4a4a",
+  borderRadius: 999,
+  padding: "2px 7px",
+  fontSize: 10,
+  fontFamily: "monospace",
+  letterSpacing: 0.4,
+  fontVariantNumeric: "tabular-nums",
+});
 
 const infoTipStyle: React.CSSProperties = {
   position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
   background: "#333", color: "#ccc", padding: "6px 10px", borderRadius: 4,
   fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap", zIndex: 20,
-  lineHeight: 1.6, marginBottom: 2,
+  lineHeight: 1.6, marginBottom: 2, fontVariantNumeric: "tabular-nums",
 };
