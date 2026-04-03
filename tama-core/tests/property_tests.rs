@@ -159,6 +159,39 @@ fn arb_valid_pet_state() -> BoxedStrategy<PetState> {
         .boxed()
 }
 
+fn make_alive(mut state: PetState) -> PetState {
+    if state.stage == LifeStage::Dead {
+        state.stage = LifeStage::Baby;
+        state.character = Character::Babytchi;
+        state.teen_type = None;
+    }
+    state.is_alive = true;
+    state
+}
+
+fn arb_alive_pet_state() -> BoxedStrategy<PetState> {
+    arb_valid_pet_state().prop_map(make_alive).boxed()
+}
+
+fn arb_awake_alive_pet_state() -> BoxedStrategy<PetState> {
+    arb_alive_pet_state()
+        .prop_map(|mut state| {
+            state.is_sleeping = false;
+            state
+        })
+        .boxed()
+}
+
+fn arb_feedable_pet_state() -> BoxedStrategy<PetState> {
+    arb_awake_alive_pet_state()
+        .prop_map(|mut state| {
+            state.is_sick = false;
+            state.sick_dose_count = 0;
+            state
+        })
+        .boxed()
+}
+
 
 // ── Property 1: State invariants (meter bounds) ─────────────────────────────
 // **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5**
@@ -248,10 +281,7 @@ proptest! {
 
 proptest! {
     #[test]
-    fn prop_feed_meal_correctness(mut state in arb_valid_pet_state()) {
-        // Only test on alive, awake, non-sick pets (feed_meal preconditions)
-        prop_assume!(state.is_alive && !state.is_sleeping && !state.is_sick);
-
+    fn prop_feed_meal_correctness(mut state in arb_feedable_pet_state()) {
         let old_hunger = state.hunger;
         let old_weight = state.weight;
 
@@ -282,10 +312,7 @@ proptest! {
 
 proptest! {
     #[test]
-    fn prop_feed_snack_correctness(mut state in arb_valid_pet_state()) {
-        // Only test on alive, awake pets (feed_snack preconditions — no sick check needed)
-        prop_assume!(state.is_alive && !state.is_sleeping);
-
+    fn prop_feed_snack_correctness(mut state in arb_awake_alive_pet_state()) {
         let old_happiness = state.happiness;
         let old_weight = state.weight;
 
@@ -324,16 +351,13 @@ fn arb_choice() -> impl Strategy<Value = Choice> {
 proptest! {
     #[test]
     fn prop_game_outcome_correctness(
-        mut state in arb_valid_pet_state(),
+        mut state in arb_feedable_pet_state(),
         m0 in arb_choice(),
         m1 in arb_choice(),
         m2 in arb_choice(),
         m3 in arb_choice(),
         m4 in arb_choice(),
     ) {
-        // Filter to alive, awake, non-sick pets (play_game preconditions)
-        prop_assume!(state.is_alive && !state.is_sleeping && !state.is_sick);
-
         let old_happiness = state.happiness;
         let old_weight = state.weight;
         let moves = [m0, m1, m2, m3, m4];

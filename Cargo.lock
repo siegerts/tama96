@@ -4069,7 +4069,7 @@ dependencies = [
 
 [[package]]
 name = "tama-core"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "chrono",
  "libc",
@@ -4082,7 +4082,7 @@ dependencies = [
 
 [[package]]
 name = "tama-tauri"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "chrono",
  "cocoa",
@@ -4100,7 +4100,7 @@ dependencies = [
 
 [[package]]
 name = "tama-tui"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "chrono",
  "crossterm",
