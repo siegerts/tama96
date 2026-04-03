@@ -434,7 +434,7 @@ export default function PetDisplay({
 
   return (
     <div style={containerStyle}>
-      <div style={{ position: "relative" }}>
+      <div style={lcdFrameStyle}>
         <canvas
           ref={canvasRef}
           style={lcdStyle}
@@ -673,10 +673,29 @@ const containerStyle: React.CSSProperties = {
   gap: 4, width: "100%", padding: "4px 0",
 };
 
+const lcdFrameStyle: React.CSSProperties = {
+  position: "relative",
+  padding: 3,
+  borderRadius: 9,
+  background: "linear-gradient(180deg, rgba(74, 96, 72, 0.45), rgba(53, 69, 48, 0.34))",
+  boxShadow: [
+    "inset 0 3px 8px rgba(26, 38, 25, 0.42)",
+    "inset 0 -2px 4px rgba(255, 255, 255, 0.16)",
+    "0 1px 0 rgba(255, 255, 255, 0.08)",
+  ].join(", "),
+};
+
 const lcdStyle: React.CSSProperties = {
-  border: "3px solid #6b7353", borderRadius: 4,
-  boxShadow: "inset 0 0 12px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.3)",
-  imageRendering: "pixelated", display: "block",
+  border: "2px solid #747e5d",
+  borderRadius: 6,
+  boxShadow: [
+    "inset 0 1px 0 rgba(255, 255, 255, 0.18)",
+    "inset 0 -14px 20px rgba(78, 87, 50, 0.16)",
+    "inset 10px 0 14px rgba(255, 255, 255, 0.04)",
+    "inset -10px 0 14px rgba(52, 61, 32, 0.05)",
+  ].join(", "),
+  imageRendering: "pixelated",
+  display: "block",
 };
 
 const tooltipStyle: React.CSSProperties = {

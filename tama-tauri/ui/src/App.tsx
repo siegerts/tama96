@@ -20,11 +20,15 @@ const SHELL_COLORS = [
 
 const STORAGE_KEY = "tama96_shell_color";
 
+function randomShellColor(): string {
+  return SHELL_COLORS[Math.floor(Math.random() * SHELL_COLORS.length)].value;
+}
+
 function loadShellColor(): string {
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? SHELL_COLORS[0].value;
+    return localStorage.getItem(STORAGE_KEY) ?? randomShellColor();
   } catch {
-    return SHELL_COLORS[0].value;
+    return randomShellColor();
   }
 }
 
