@@ -1,7 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
+
 const dl = 'https://github.com/siegerts/tama96/releases/latest/download';
-const releases = 'https://github.com/siegerts/tama96/releases';
+const repo = 'siegerts/tama96';
+const releases = `https://github.com/${repo}/releases`;
 ---
 
 <Base title="tama96 - Download">
@@ -14,27 +16,27 @@ const releases = 'https://github.com/siegerts/tama96/releases';
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Apple Silicon)</div>
         <span class="card-hint">aarch64.dmg</span>
-        <a href={`${dl}/tama96_0.1.0_aarch64.dmg`} class="dl">Download .dmg</a>
+        <a href={`${dl}/tama96_aarch64.dmg`} class="dl">Download .dmg</a>
       </div>
       <div class="card" data-platform="mac">
         <div class="card-title">macOS (Intel)</div>
         <span class="card-hint">x64.dmg</span>
-        <a href={`${dl}/tama96_0.1.0_x64.dmg`} class="dl">Download .dmg</a>
+        <a href={`${dl}/tama96_x64.dmg`} class="dl">Download .dmg</a>
       </div>
       <div class="card" data-platform="windows">
         <div class="card-title">Windows</div>
         <span class="card-hint">x64-setup.exe</span>
-        <a href={`${dl}/tama96_0.1.0_x64-setup.exe`} class="dl">Download .exe</a>
+        <a href={`${dl}/tama96_x64-setup.exe`} class="dl">Download .exe</a>
       </div>
       <div class="card" data-platform="linux">
         <div class="card-title">Linux (deb)</div>
         <span class="card-hint">amd64.deb</span>
-        <a href={`${dl}/tama96_0.1.0_amd64.deb`} class="dl">Download .deb</a>
+        <a href={`${dl}/tama96_amd64.deb`} class="dl">Download .deb</a>
       </div>
       <div class="card" data-platform="linux">
         <div class="card-title">Linux (AppImage)</div>
         <span class="card-hint">amd64.AppImage</span>
-        <a href={`${dl}/tama96_0.1.0_amd64.AppImage`} class="dl">Download .AppImage</a>
+        <a href={`${dl}/tama96_amd64.AppImage`} class="dl">Download .AppImage</a>
       </div>
     </div>
 

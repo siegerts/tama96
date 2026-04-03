@@ -205,11 +205,18 @@ Configure via the "settings" button in the desktop app or edit `~/.tama96/permis
 
 ## Building for distribution
 
-To create release builds for all platforms, push a version tag:
+To prepare a release from a clean worktree:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+node scripts/prepare-release.mjs X.Y.Z
+```
+
+That script syncs all version files, runs the release checks, creates the release commit, and tags it as `vX.Y.Z`.
+
+To push the release immediately:
+
+```bash
+node scripts/prepare-release.mjs X.Y.Z --push
 ```
 
 This triggers the GitHub Actions workflow which builds:
