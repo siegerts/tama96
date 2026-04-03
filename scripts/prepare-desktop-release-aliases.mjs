@@ -14,7 +14,6 @@ if (!target) {
   process.exit(1);
 }
 
-const bundleRoot = path.join(root, "tama-tauri", "src-tauri", "target", target, "release", "bundle");
 const outputRoot = path.join(root, "release-aliases", target);
 
 const aliasPlan = {
@@ -50,12 +49,32 @@ function listFiles(dirPath) {
   return files;
 }
 
+function resolveBundleRoot(targetTriple) {
+  const candidateTargetRoots = [
+    process.env.CARGO_TARGET_DIR ? path.resolve(root, process.env.CARGO_TARGET_DIR) : null,
+    path.join(root, "target"),
+    path.join(root, "tama-tauri", "target"),
+    path.join(root, "tama-tauri", "src-tauri", "target"),
+  ].filter(Boolean);
+
+  for (const targetRoot of candidateTargetRoots) {
+    const bundleRoot = path.join(targetRoot, targetTriple, "release", "bundle");
+    if (fs.existsSync(bundleRoot)) {
+      return bundleRoot;
+    }
+  }
+
+  return path.join(candidateTargetRoots[0], targetTriple, "release", "bundle");
+}
+
 const plan = aliasPlan[target];
 
 if (!plan) {
   console.error(`[prepare-desktop-release-aliases] unsupported target: ${target}`);
   process.exit(1);
 }
+
+const bundleRoot = resolveBundleRoot(target);
 
 if (!fs.existsSync(bundleRoot)) {
   console.error(`[prepare-desktop-release-aliases] bundle directory not found: ${bundleRoot}`);
