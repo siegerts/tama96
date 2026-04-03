@@ -1,12 +1,16 @@
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { registerTools } from "./tools.js";
 import { registerResources } from "./resources.js";
 import { bridge } from "./bridge.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
+
 const server = new McpServer({
   name: "tama96",
-  version: "0.1.0",
+  version,
 });
 
 registerTools(server);

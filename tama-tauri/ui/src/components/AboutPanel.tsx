@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-shell";
 
 interface AboutPanelProps {
@@ -17,6 +19,24 @@ function ExtLink({ href, children }: { href: string; children: React.ReactNode }
 }
 
 export default function AboutPanel({ onClose }: AboutPanelProps) {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getVersion()
+      .then((value) => {
+        if (!cancelled) setVersion(value);
+      })
+      .catch(() => {
+        if (!cancelled) setVersion("unknown");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
@@ -26,7 +46,7 @@ export default function AboutPanel({ onClose }: AboutPanelProps) {
         </div>
 
         <div style={{ fontSize: 11, fontFamily: "monospace", color: "#999", lineHeight: 2 }}>
-          <div>v0.1.0</div>
+          <div>{version ? `v${version}` : "version..."}</div>
           <div>Made by <ExtLink href="https://x.com/siegerts">@siegerts</ExtLink></div>
           <div>Built with <ExtLink href="https://kiro.dev/">Kiro</ExtLink></div>
           <div><ExtLink href="https://github.com/siegerts/tama96">GitHub</ExtLink></div>
