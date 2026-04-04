@@ -175,7 +175,7 @@ The config looks like this (paths are filled in automatically):
   "mcpServers": {
     "tama96": {
       "command": "node",
-      "args": ["/path/to/mcp-server/dist/index.js"]
+      "args": ["/path/to/index.js"]
     }
   }
 }

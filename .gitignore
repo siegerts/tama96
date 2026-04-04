@@ -10,6 +10,8 @@ dist/
 # Tauri
 tama-tauri/src-tauri/target/
 tama-tauri/src-tauri/gen/
+tama-tauri/src-tauri/mcp-server-dist/*
+!tama-tauri/src-tauri/mcp-server-dist/.gitkeep
 
 # OS
 .DS_Store

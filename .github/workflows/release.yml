@@ -54,12 +54,8 @@ jobs:
           npm ci
           npm run build
 
-      - name: Copy MCP server to bundle location
-        run: |
-          mkdir -p tama-tauri/src-tauri/mcp-server-dist
-          cp -r mcp-server/dist/* tama-tauri/src-tauri/mcp-server-dist/
-          cp mcp-server/package.json tama-tauri/src-tauri/mcp-server-dist/
-        shell: bash
+      - name: Prepare MCP bundle resources
+        run: node scripts/prepare-mcp-bundle.mjs
 
       - name: Install UI dependencies and build
         run: |

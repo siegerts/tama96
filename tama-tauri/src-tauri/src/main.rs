@@ -211,11 +211,13 @@ fn main() {
             });
 
             // ── MCP sidecar lifecycle ───────────────────────────────────
-            sidecar::write_mcp_config();
+            let app_handle = app.handle().clone();
+            sidecar::write_mcp_config(&app_handle);
             let sidecar_cancel = Arc::new(AtomicBool::new(false));
             let sidecar_cancel_clone = Arc::clone(&sidecar_cancel);
+            let sidecar_app = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                sidecar::start_sidecar(sidecar_cancel_clone).await;
+                sidecar::start_sidecar(sidecar_app, sidecar_cancel_clone).await;
             });
             // Store cancel token so we can signal shutdown on quit
             app.manage(sidecar_cancel);
@@ -223,7 +225,6 @@ fn main() {
             // ── Background tick loop ────────────────────────────────────
             let tick_pet_loop = Arc::clone(&tick_pet);
             let tick_path = tick_save_path.clone();
-            let app_handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
                 let mut interval = tokio::time::interval(Duration::from_secs(60));
