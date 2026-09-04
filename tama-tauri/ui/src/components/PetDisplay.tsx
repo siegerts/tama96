@@ -508,7 +508,7 @@ const EVOLUTION_INFO: Record<string, { ageThreshold?: number; minutesThreshold?:
 type SleepTone = "neutral" | "normal" | "alert" | "sleep";
 
 function minutesUntilHour(hour: number, now: Date): number {
-  const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const targetMinutes = hour * 60;
   let diff = targetMinutes - currentMinutes;
   if (diff < 0) diff += 24 * 60;

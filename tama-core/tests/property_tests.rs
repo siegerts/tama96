@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, TimeZone, Utc};
 use proptest::prelude::*;
 use tama_core::actions;
 use tama_core::actions::Choice;
@@ -592,9 +592,13 @@ proptest! {
         let stats = CharacterStats::for_character(&state.character);
 
         // Create a time that's within the sleep window
-        // Use sleep_hour + 1 (mod 24) to ensure we're in the sleep window
+        // Use sleep_hour + 1 (mod 24) to ensure we're in the sleep window.
+        // Build in local time so the engine's local-clock check matches on any machine.
         let sleep_hour = stats.sleep_hour as u32;
-        let now = Utc.with_ymd_and_hms(2024, 6, 15, (sleep_hour + 1) % 24, 30, 0).unwrap();
+        let now = Local
+            .with_ymd_and_hms(2024, 6, 15, (sleep_hour + 1) % 24, 30, 0)
+            .unwrap()
+            .with_timezone(&Utc);
         state.last_tick = now - chrono::Duration::minutes(60);
 
         // Simulate what tick() does for sleeping pets: only check_wake, no decay
