@@ -75,6 +75,22 @@ export interface GameResult {
   happiness_gained: number;
 }
 
+export interface GameSession {
+  sequence: Choice[];
+  round: number;
+  wins: number;
+}
+
+export interface RoundOutcome {
+  pet_choice: Choice;
+  won: boolean;
+  round: number;
+  wins: number;
+  finished: boolean;
+  happiness_gained: number;
+  weight: number;
+}
+
 export interface ActionPermission {
   allowed: boolean;
   max_per_hour: number | null;

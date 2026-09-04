@@ -212,6 +212,16 @@ fn dead_pet_actions_return_pet_is_dead() {
         ),
         Err(ActionError::PetIsDead)
     );
+    assert_eq!(actions::start_game(&s), Err(ActionError::PetIsDead));
+    let mut sess = actions::GameSession {
+        sequence: [const { Choice::Left }; 5],
+        round: 0,
+        wins: 0,
+    };
+    assert_eq!(
+        actions::play_round(&mut s, &mut sess, Choice::Left),
+        Err(ActionError::PetIsDead)
+    );
     assert_eq!(actions::discipline(&mut s), Err(ActionError::PetIsDead));
     assert_eq!(actions::give_medicine(&mut s), Err(ActionError::PetIsDead));
     assert_eq!(actions::clean_poop(&mut s), Err(ActionError::PetIsDead));
@@ -219,6 +229,51 @@ fn dead_pet_actions_return_pet_is_dead() {
         actions::toggle_lights(&mut s, now),
         Err(ActionError::PetIsDead)
     );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn game_session_full_game_matches_play_game() {
+    let dir = temp_dir();
+    let now = Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap();
+
+    let base = PetState::new_egg(now);
+    let mut state = round_trip(&base, &dir);
+    state.is_alive = true;
+    state.is_sleeping = false;
+    state.is_sick = false;
+    state.hunger = 2;
+    state.happiness = 3;
+    state.weight = 3;
+
+    let moves = [
+        Choice::Left,
+        Choice::Right,
+        Choice::Left,
+        Choice::Right,
+        Choice::Left,
+    ];
+
+    let mut session_state = state.clone();
+    let mut session = actions::start_game(&session_state).expect("game should start");
+    let mut revealed: Vec<Choice> = Vec::new();
+    for m in moves {
+        let outcome = actions::play_round(&mut session_state, &mut session, m).expect("round");
+        revealed.push(outcome.pet_choice);
+        if outcome.finished {
+            assert_eq!(
+                outcome.round, 5,
+                "final round should be 5th revealed pick"
+            );
+        }
+    }
+
+    let mut before = state.clone();
+    let mut partial = actions::start_game(&before).expect("game should start");
+    let _ = actions::play_round(&mut before, &mut partial, Choice::Left).expect("round");
+    assert_eq!(before.happiness, state.happiness, "abandoned game changed happiness");
+    assert_eq!(before.weight, state.weight, "abandoned game changed weight");
 
     let _ = fs::remove_dir_all(&dir);
 }

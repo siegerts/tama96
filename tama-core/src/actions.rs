@@ -29,6 +29,7 @@ pub enum ActionError {
     PetIsSick,
     NoDisciplineCallPending,
     NoPoop,
+    GameAlreadyFinished,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -95,6 +96,38 @@ pub fn feed_snack(state: &mut PetState) -> Result<ActionResult, ActionError> {
 /// Weight always decreases: weight = max(old - 1, 1).
 /// Returns GameResult { rounds: 5, wins, happiness_gained }.
 pub fn play_game(state: &mut PetState, moves: [Choice; 5]) -> Result<GameResult, ActionError> {
+    let mut session = start_game(state)?;
+    let mut final_outcome = None;
+    for m in moves {
+        final_outcome = Some(play_round(state, &mut session, m)?);
+    }
+    let outcome = final_outcome.expect("5 rounds played");
+    Ok(GameResult {
+        rounds: 5,
+        wins: outcome.wins,
+        happiness_gained: outcome.happiness_gained,
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GameSession {
+    pub sequence: [Choice; 5],
+    pub round: usize,
+    pub wins: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RoundOutcome {
+    pub pet_choice: Choice,
+    pub won: bool,
+    pub round: usize,
+    pub wins: u8,
+    pub finished: bool,
+    pub happiness_gained: u8,
+    pub weight: u8,
+}
+
+pub fn start_game(state: &PetState) -> Result<GameSession, ActionError> {
     if !state.is_alive {
         return Err(ActionError::PetIsDead);
     }
@@ -106,33 +139,69 @@ pub fn play_game(state: &mut PetState, moves: [Choice; 5]) -> Result<GameResult,
     }
 
     let mut rng = rand::thread_rng();
-    let mut wins: u8 = 0;
-
-    for i in 0..5 {
-        let pet_choice = if rng.gen_bool(0.5) {
+    let sequence = std::array::from_fn(|_| {
+        if rng.gen_bool(0.5) {
             Choice::Left
         } else {
             Choice::Right
-        };
-        if moves[i] == pet_choice {
-            wins += 1;
         }
+    });
+
+    Ok(GameSession {
+        sequence,
+        round: 0,
+        wins: 0,
+    })
+}
+
+pub fn play_round(
+    state: &mut PetState,
+    session: &mut GameSession,
+    choice: Choice,
+) -> Result<RoundOutcome, ActionError> {
+    if !state.is_alive {
+        return Err(ActionError::PetIsDead);
+    }
+    if state.is_sleeping {
+        return Err(ActionError::PetIsSleeping);
+    }
+    if state.is_sick {
+        return Err(ActionError::PetIsSick);
+    }
+    if session.round >= session.sequence.len() {
+        return Err(ActionError::GameAlreadyFinished);
     }
 
-    let happiness_gained = if wins >= 3 {
-        let old = state.happiness;
-        state.happiness = (old + 1).min(4);
-        state.happiness - old
+    let pet_choice = session.sequence[session.round].clone();
+    let won = choice == pet_choice;
+    if won {
+        session.wins += 1;
+    }
+    session.round += 1;
+
+    let finished = session.round == session.sequence.len();
+    let (happiness_gained, weight) = if finished {
+        let gained = if session.wins >= 3 {
+            let old = state.happiness;
+            state.happiness = (old + 1).min(4);
+            state.happiness - old
+        } else {
+            0
+        };
+        state.weight = state.weight.saturating_sub(1).max(1);
+        (gained, state.weight)
     } else {
-        0
+        (0, state.weight)
     };
 
-    state.weight = state.weight.saturating_sub(1).max(1);
-
-    Ok(GameResult {
-        rounds: 5,
-        wins,
+    Ok(RoundOutcome {
+        pet_choice,
+        won,
+        round: session.round,
+        wins: session.wins,
+        finished,
         happiness_gained,
+        weight,
     })
 }
 

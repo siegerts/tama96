@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 61d0ea5d03f9cce49a69ccd503d13b402d04c95e2c02639f5c981bc8ad1b9829 # shrinks to mut state = PetState { stage: Child, character: Marutchi, teen_type: None, hunger: 3, happiness: 0, discipline: 50, weight: 46, age: 16, care_mistakes: 8, discipline_mistakes: 9, poop_count: 0, is_sick: false, sick_dose_count: 0, is_sleeping: false, is_alive: true, lights_on: false, last_tick: 2024-01-01T00:00:00Z, birth_time: 2024-01-01T11:16:51Z, stage_start_time: 2024-07-11T21:47:43Z, last_poop_time: 2024-02-25T09:39:46Z, pending_care_deadline: None, pending_discipline_deadline: Some(2024-01-01T00:06:24Z), pending_lights_deadline: None, snack_count_since_last_tick: 0 }, p0 = Right, p1 = Left, p2 = Left, p3 = Right, p4 = Right, m0 = Right, m1 = Left, m2 = Left, m3 = Right, m4 = Right

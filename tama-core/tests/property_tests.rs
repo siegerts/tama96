@@ -412,6 +412,146 @@ proptest! {
 }
 
 
+proptest! {
+    #[test]
+    fn prop_game_session_reveal_and_reward(
+        mut state in arb_feedable_pet_state(),
+        p0 in arb_choice(), p1 in arb_choice(), p2 in arb_choice(), p3 in arb_choice(), p4 in arb_choice(),
+        m0 in arb_choice(), m1 in arb_choice(), m2 in arb_choice(), m3 in arb_choice(), m4 in arb_choice(),
+    ) {
+        let old_happiness = state.happiness;
+        let old_weight = state.weight;
+        let sequence = [p0, p1, p2, p3, p4];
+        let moves = [m0, m1, m2, m3, m4];
+
+        let mut session = actions::GameSession { sequence: sequence.clone(), round: 0, wins: 0 };
+
+        let mut wins: u8 = 0;
+        for (i, m) in moves.iter().enumerate() {
+            let pre_happiness = state.happiness;
+            let pre_weight = state.weight;
+            let outcome = actions::play_round(&mut state, &mut session, m.clone()).unwrap();
+
+            prop_assert_eq!(
+                outcome.pet_choice.clone(), sequence[i].clone(),
+                "round {} should reveal pet choice {:?}, got {:?}",
+                i + 1, sequence[i], outcome.pet_choice.clone()
+            );
+
+            prop_assert_eq!(outcome.round, i + 1, "round should be {}", i + 1);
+            let finished = i == 4;
+            prop_assert_eq!(
+                outcome.finished, finished,
+                "finished should be {} at round {}",
+                finished, i + 1
+            );
+
+            let expected_won = *m == sequence[i];
+            prop_assert_eq!(outcome.won, expected_won, "won mismatch at round {}", i + 1);
+            if expected_won {
+                wins += 1;
+            }
+            prop_assert_eq!(outcome.wins, wins);
+
+            if finished {
+                let expected_gained = if wins >= 3 {
+                    (pre_happiness + 1).min(4) - pre_happiness
+                } else {
+                    0
+                };
+                prop_assert_eq!(
+                    outcome.happiness_gained, expected_gained,
+                    "final round happiness_gained mismatch"
+                );
+                prop_assert_eq!(state.weight, pre_weight.saturating_sub(1).max(1));
+                prop_assert_eq!(outcome.weight, state.weight);
+            } else {
+                prop_assert_eq!(state.happiness, pre_happiness,
+                    "non-final rounds must not change happiness");
+                prop_assert_eq!(state.weight, pre_weight,
+                    "non-final rounds must not change weight");
+                prop_assert_eq!(outcome.happiness_gained, 0);
+            }
+        }
+
+        if wins >= 3 {
+            prop_assert_eq!(state.happiness, (old_happiness + 1).min(4));
+        } else {
+            prop_assert_eq!(state.happiness, old_happiness);
+        }
+        prop_assert_eq!(state.weight, old_weight.saturating_sub(1).max(1));
+    }
+
+    #[test]
+    fn prop_game_session_preconditions(
+        state in arb_feedable_pet_state(),
+    ) {
+        {
+            let mut dead = state.clone();
+            dead.is_alive = false;
+            prop_assert_eq!(actions::start_game(&dead), Err(actions::ActionError::PetIsDead));
+            let mut sess = actions::GameSession { sequence: [const { Choice::Left }; 5], round: 0, wins: 0 };
+            prop_assert_eq!(
+                actions::play_round(&mut dead, &mut sess, Choice::Left),
+                Err(actions::ActionError::PetIsDead)
+            );
+        }
+
+        {
+            let mut sleeping = state.clone();
+            sleeping.is_sleeping = true;
+            prop_assert_eq!(actions::start_game(&sleeping), Err(actions::ActionError::PetIsSleeping));
+            let mut sess = actions::GameSession { sequence: [const { Choice::Left }; 5], round: 0, wins: 0 };
+            prop_assert_eq!(
+                actions::play_round(&mut sleeping, &mut sess, Choice::Right),
+                Err(actions::ActionError::PetIsSleeping)
+            );
+        }
+
+        {
+            let mut sick = state.clone();
+            sick.is_sick = true;
+            prop_assert_eq!(actions::start_game(&sick), Err(actions::ActionError::PetIsSick));
+            let mut sess = actions::GameSession { sequence: [const { Choice::Left }; 5], round: 0, wins: 0 };
+            prop_assert_eq!(
+                actions::play_round(&mut sick, &mut sess, Choice::Left),
+                Err(actions::ActionError::PetIsSick)
+            );
+        }
+
+        {
+            let mut sess = actions::GameSession { sequence: [const { Choice::Left }; 5], round: 5, wins: 0 };
+            prop_assert_eq!(
+                actions::play_round(&mut state.clone(), &mut sess, Choice::Left),
+                Err(actions::ActionError::GameAlreadyFinished)
+            );
+        }
+    }
+
+    #[test]
+    fn prop_game_session_abandonment_applies_nothing(
+        mut state in arb_feedable_pet_state(),
+        p0 in arb_choice(), p1 in arb_choice(), p2 in arb_choice(), p3 in arb_choice(), p4 in arb_choice(),
+        m0 in arb_choice(), m1 in arb_choice(),
+    ) {
+        let old_happiness = state.happiness;
+        let old_weight = state.weight;
+        let mut session = actions::GameSession {
+            sequence: [p0, p1, p2, p3, p4],
+            round: 0,
+            wins: 0,
+        };
+
+        for m in [m0, m1] {
+            let outcome = actions::play_round(&mut state, &mut session, m).unwrap();
+            prop_assert!(!outcome.finished);
+        }
+        prop_assert_eq!(state.happiness, old_happiness, "abandoned game changed happiness");
+        prop_assert_eq!(state.weight, old_weight, "abandoned game changed weight");
+    }
+}
+
+
 // ── Property 10: Discipline action correctness ──────────────────────────────
 // **Validates: Requirements 3.6, 3.7**
 

@@ -1,15 +1,17 @@
 import { useRef, useEffect, useState, useCallback } from "react";
-import type { PetState, Choice } from "../types";
+import type { Choice, GameSession, PetState, RoundOutcome } from "../types";
+import GameScreen from "./GameScreen";
 
 export interface PetDisplayProps {
   state: PetState;
   feedMeal: () => Promise<void>;
   feedSnack: () => Promise<void>;
-  playGame: (moves: Choice[]) => Promise<unknown>;
   discipline: () => Promise<void>;
   giveMedicine: () => Promise<void>;
   cleanPoop: () => Promise<void>;
   toggleLights: () => Promise<void>;
+  startGame: () => Promise<GameSession>;
+  playRound: (session: GameSession, choice: Choice) => Promise<RoundOutcome>;
 }
 
 // ── Pixel grid sprites (16x16 grids, 1 = dark pixel, 0 = off) ──────────────
@@ -112,6 +114,87 @@ const SPRITES: Record<string, Sprite> = {
   ],
 };
 
+const GLYPH_OK: number[] = [0b000001, 0b000010, 0b000100, 0b001000, 0b110000, 0b011000];
+const GLYPH_X: number[] = [0b100001, 0b010010, 0b001100, 0b001100, 0b010010, 0b100001];
+const GLYPH_PTR: number[] = [0b0010, 0b0110, 0b1110, 0b1111];
+
+const GLYPH_BURGER: number[] = [
+  0b01111110, 0b11111111, 0b11111111, 0b00000000,
+  0b11111111, 0b00000000, 0b11111111, 0b11111111,
+  0b01111110,
+];
+const GLYPH_CANDY: number[] = [
+  0b01000010, 0b01100110, 0b01111110, 0b01111110,
+  0b01111110, 0b01100110, 0b01000010, 0b00000000,
+];
+
+const FONT: Record<string, number[]> = {
+  "0": [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
+  "1": [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
+  "2": [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111],
+  "3": [0b11111, 0b00010, 0b00100, 0b00010, 0b00001, 0b10001, 0b01110],
+  "4": [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
+  "5": [0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110],
+  "6": [0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
+  "7": [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
+  "8": [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
+  "9": [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100],
+  "/": [0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000],
+  "+": [0b00000, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0b00000],
+  "W": [0b10001, 0b10001, 0b10001, 0b10101, 0b11111, 0b10101, 0b10001],
+  "T": [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
+  "O": [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
+  "N": [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
+  "h": [0b00000, 0b01010, 0b11111, 0b11111, 0b01110, 0b00100, 0b00000],
+  ".": [0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100, 0b00000],
+};
+
+const CONFETTI_COLORS = ["#2d3320", "#556b2f", "#8a9a5b", "#b4bf91"];
+
+function drawConfetti(
+  ctx: CanvasRenderingContext2D, canvasW: number, px: number,
+  frame: number, y: number, bandH: number, scale = 1,
+) {
+  const cell = px * scale;
+  for (let i = 0; i < 14; i++) {
+    const x = 2 * px + ((i * 37 + frame * 11) % (canvasW - 5 * px));
+    const speed = 2 * px + ((i * 5) % 3) * px;
+    const yy = y + ((frame * speed + ((i * 7) % 11) * px) % Math.max(bandH, px));
+    const size = (((i * 3 + frame) % 2) + 1) * cell;
+    ctx.fillStyle = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    ctx.fillRect(x, yy, size, size);
+  }
+}
+
+function textWidth(text: string, px: number, scale = 1): number {
+  return (text.length * (5 + 1) * px - px) * scale;
+}
+
+function drawText(
+  ctx: CanvasRenderingContext2D, text: string,
+  x: number, y: number, px: number, color: string, scale = 1,
+) {
+  const step = (5 + 1) * px * scale;
+  const cell = px * scale;
+  ctx.fillStyle = color;
+  for (let ci = 0; ci < text.length; ci++) {
+    const ch = text[ci];
+    if (ch !== " ") {
+      const glyph = FONT[ch];
+      if (glyph) {
+        for (let row = 0; row < glyph.length; row++) {
+          for (let col = 0; col < 5; col++) {
+            if ((glyph[row] >> (4 - col)) & 1) {
+              ctx.fillRect(x + col * cell, y + row * cell, cell, cell);
+            }
+          }
+        }
+      }
+    }
+    x += step;
+  }
+}
+
 // ── Icon strip sprites (8x8) ───────────────────────────────────────────────
 const ICON_FEED: number[] = [0b00100100, 0b00100100, 0b01111110, 0b01000010, 0b01000010, 0b00111100, 0b00011000, 0b00000000];
 const ICON_LIGHT: number[] = [0b00011000, 0b00100100, 0b01000010, 0b01011010, 0b01000010, 0b00100100, 0b00011000, 0b00000000];
@@ -209,21 +292,24 @@ function getIconRegions(totalWidth: number, y: number, px: number) {
   }));
 }
 
-function randomMoves(): Choice[] {
-  return Array.from({ length: 5 }, () => (Math.random() < 0.5 ? "Left" : "Right"));
-}
-
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function PetDisplay({
-  state, feedMeal, feedSnack, playGame,
-  discipline, giveMedicine, cleanPoop, toggleLights,
+  state, feedMeal, feedSnack,
+  discipline, giveMedicine, cleanPoop, toggleLights, startGame, playRound,
 }: PetDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoverIcon, setHoverIcon] = useState<{ row: "top" | "bottom"; index: number } | null>(null);
   const [feedSubmenu, setFeedSubmenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animFrame, setAnimFrame] = useState(0);
+  const [actionAnim, setActionAnim] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+  const [revealAnim, setRevealAnim] = useState<{ dir: "Left" | "Right"; won: boolean; step: number } | null>(null);
+  const [feedAnim, setFeedAnim] = useState<{ kind: "meal" | "snack"; step: number } | null>(null);
+  const [gameScore, setGameScore] = useState<{ wins: number; happiness_gained: number; weight: number } | null>(null);
+  const [celebrateFrame, setCelebrateFrame] = useState(0);
+  const pendingScoreRef = useRef<{ wins: number; happiness_gained: number; weight: number } | null>(null);
   const lastLightsDeadlineRef = useRef<string | null>(null);
 
   const px = PX;
@@ -253,6 +339,88 @@ export default function PetDisplay({
     setTimeout(() => setToast(null), 1500);
   }, []);
 
+  const triggerActionAnim = useCallback((ms = 1000) => {
+    setActionAnim(true);
+    setTimeout(() => setActionAnim(false), ms);
+  }, []);
+
+  const handleReveal = useCallback((outcome: RoundOutcome) => {
+    setRevealAnim({ dir: outcome.pet_choice, won: outcome.won, step: 0 });
+    if (outcome.finished) {
+      pendingScoreRef.current = {
+        wins: outcome.wins,
+        happiness_gained: outcome.happiness_gained,
+        weight: outcome.weight,
+      };
+    }
+  }, []);
+
+  const handleGameStart = useCallback(() => {
+    pendingScoreRef.current = null;
+    setGameScore(null);
+  }, []);
+
+  const handleGameExit = useCallback(() => {
+    pendingScoreRef.current = null;
+    setGameScore(null);
+    setGameActive(false);
+  }, []);
+
+  useEffect(() => {
+    if (!revealAnim) return;
+    if (revealAnim.step >= 26) {
+      setRevealAnim(null);
+      if (pendingScoreRef.current) {
+        setGameScore(pendingScoreRef.current);
+        pendingScoreRef.current = null;
+      }
+      return;
+    }
+    const t = setTimeout(() => {
+      setRevealAnim(a => (a && a.step < 26 ? { ...a, step: a.step + 1 } : a));
+    }, 60);
+    return () => clearTimeout(t);
+  }, [revealAnim]);
+
+  useEffect(() => {
+    if (!feedAnim) return;
+    if (feedAnim.step >= 12) {
+      setFeedAnim(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setFeedAnim(a => (a && a.step < 12 ? { ...a, step: a.step + 1 } : a));
+    }, 60);
+    return () => clearTimeout(t);
+  }, [feedAnim]);
+
+  useEffect(() => {
+    if (!gameScore) {
+      setCelebrateFrame(0);
+      return;
+    }
+    const interval = setInterval(() => setCelebrateFrame(f => f + 1), 120);
+    return () => clearInterval(interval);
+  }, [gameScore]);
+
+  useEffect(() => {
+    if (!gameScore) return;
+    const t = setTimeout(() => setGameScore(null), 4000);
+    return () => clearTimeout(t);
+  }, [gameScore]);
+
+  const [bounce, setBounce] = useState(0);
+  useEffect(() => {
+    if (!actionAnim) {
+      setBounce(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setBounce(prev => (prev + 1) % 8);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [actionAnim]);
+
   useEffect(() => {
     if (
       state.pending_lights_deadline
@@ -281,14 +449,26 @@ export default function PetDisplay({
       if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
         try {
           if (i === 0) { // Feed
-            setFeedSubmenu(prev => !prev);
+            if (state.is_sleeping) {
+              showToast("Pet is sleeping");
+            } else {
+              setFeedSubmenu(prev => !prev);
+            }
           } else if (i === 1) { // Light
             await toggleLights();
           } else if (i === 2) { // Game
-            await playGame(randomMoves());
-            showToast("Game played!");
+            if (gameActive) {
+              pendingScoreRef.current = null;
+              setGameScore(null);
+              setGameActive(false);
+            } else if (!state.is_sleeping) {
+              setGameActive(true);
+            } else {
+              showToast("Pet is sleeping");
+            }
           } else if (i === 3) { // Medicine
             await giveMedicine();
+            triggerActionAnim();
             showToast("Medicine given");
           }
         } catch (err) { showToast(String(err)); }
@@ -325,7 +505,7 @@ export default function PetDisplay({
 
     // Click elsewhere closes feed submenu
     setFeedSubmenu(false);
-  }, [canvasW, canvasH, bottomIconY, px, state, toggleLights, playGame, giveMedicine, cleanPoop, discipline, showToast, sleepStatus.summary]);
+  }, [canvasW, canvasH, bottomIconY, px, state, gameActive, toggleLights, giveMedicine, cleanPoop, discipline, showToast, triggerActionAnim, sleepStatus.summary]);
 
   // Handle hover for cursor + tooltip
   const handleCanvasMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -372,10 +552,11 @@ export default function PetDisplay({
     canvas.style.height = `${canvasH}px`;
     ctx.scale(dpr, dpr);
 
-    const bg = "#c4cfa1";
     const pixel = "#2d3320";
     const ghost = "#b4bf91";
 
+    const bg = "#c4cfa1";
+    const s = revealAnim ? revealAnim.step : -1;
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
@@ -387,14 +568,99 @@ export default function PetDisplay({
     y += iconRowH + gap;
 
     // Pet sprite with idle movement
+    const showScore = gameScore !== null;
     const spriteKey = getSpriteKey(state);
     const sprite = SPRITES[spriteKey] ?? SPRITES["Egg"];
     const baseSpriteX = (canvasW - 16 * px) / 2;
     // Idle horizontal offset: 0, +2px, 0, -2px
     const idleOffsets = [0, 2 * px, 0, -2 * px];
-    const offsetX = (state.is_alive && !state.is_sleeping) ? idleOffsets[animFrame] : 0;
-    const spriteX = baseSpriteX + offsetX;
-    drawSprite(ctx, sprite, spriteX, y, 16, px, pixel);
+    const idleOn = state.is_alive && !state.is_sleeping && !revealAnim && !feedAnim;
+    const offsetX = idleOn ? idleOffsets[animFrame] : 0;
+
+    const feedStep = feedAnim ? feedAnim.step : -1;
+    let feedGlyph: number[] | null = null;
+    if (feedAnim && feedStep < 8) {
+      feedGlyph = feedAnim.kind === "meal" ? GLYPH_BURGER : GLYPH_CANDY;
+    }
+    const feedJumpY = feedAnim
+      ? (feedAnim.kind === "meal"
+        ? [0, -px, -2 * px, -px, 0, -2 * px, -px, 0, 0, 0, 0, 0][feedStep]
+        : [0, -px, 0, -px, 0, 0, 0, 0, 0, 0, 0, 0][feedStep])
+      : 0;
+
+    const DASH = 8 * px;
+    const dirSign = revealAnim?.dir === "Left" ? -1 : 1;
+    const easeOut = (p: number) => 1 - (1 - p) * (1 - p);
+    let revealX = 0;
+    let revealY = 0;
+    let badge: { x: number; y: number; glyph: number[]; color: string } | null = null;
+    let laneArrowX: number | null = null;
+    if (revealAnim) {
+      if (s <= 9) {
+        const p = easeOut(s / 9);
+        revealX = dirSign * DASH * p;
+        revealY = s % 2 === 1 ? -px : 0;
+      } else if (s <= 14) {
+        revealX = dirSign * DASH;
+        if (s % 2 === 0) {
+          laneArrowX = revealAnim.dir === "Left" ? 1 * px : canvasW - 5 * px;
+        }
+      } else if (s <= 20) {
+        revealX = dirSign * DASH;
+        if (revealAnim.won) {
+          revealY = [0, -px, -2 * px, -px, -2 * px, -px][s - 15];
+        } else {
+          revealY = [0, 2 * px, px, 2 * px, px, 0][s - 15];
+        }
+        const bx = revealX > 0
+          ? baseSpriteX + revealX - 7 * px
+          : baseSpriteX + revealX + 17 * px;
+        badge = {
+          x: bx,
+          y: y + px,
+          glyph: revealAnim.won ? GLYPH_OK : GLYPH_X,
+          color: pixel,
+        };
+      } else {
+        const p = 1 - (s - 21) / 4;
+        revealX = dirSign * DASH * p;
+      }
+    }
+
+    const actionBounceY = actionAnim ? [0, -px, 0, px][bounce % 4] : 0;
+    let spriteY = y + actionBounceY + revealY + feedJumpY;
+    const spriteX = baseSpriteX + offsetX + revealX;
+
+    if (showScore && gameScore && gameScore.wins >= 3) {
+      spriteY += [0, -px, -2 * px, -px, 0, 0][celebrateFrame % 6];
+    }
+
+    drawSprite(ctx, sprite, spriteX, spriteY, 16, px, pixel);
+
+    if (feedGlyph) {
+      const gy = y + 6 * px + (feedStep >= 5 ? 1 * px : 0);
+      drawSprite(ctx, feedGlyph, spriteX - 9 * px, gy, 8, px, pixel);
+    }
+    if (feedAnim && feedStep >= 4 && feedStep <= 9) {
+      const cx = spriteX + 8 * px;
+      const cy = spriteY + 4 * px;
+      for (let i = 0; i < 3; i++) {
+        const dx = ((i * 5 + feedStep) % 18) - 9;
+        const dy = ((i * 3 + feedStep) % 14) - 7;
+        ctx.fillStyle = CONFETTI_COLORS[(feedStep + i) % CONFETTI_COLORS.length];
+        ctx.fillRect(cx + dx * px, cy + dy * px, px, px);
+      }
+    }
+
+    if (laneArrowX !== null) {
+      drawSprite(ctx, GLYPH_PTR, laneArrowX, y + px, 4, px, pixel);
+    }
+    if (badge) {
+      drawSprite(ctx, badge.glyph, badge.x, badge.y, 6, px, badge.color);
+    }
+    if (revealAnim && revealAnim.won && s >= 15 && s <= 20) {
+      drawConfetti(ctx, canvasW, px, s, y, spriteH);
+    }
 
     // Poop
     if (state.poop_count > 0 && state.is_alive) {
@@ -408,18 +674,28 @@ export default function PetDisplay({
     y += spriteH + gap;
 
     // Hunger hearts
+    const scoreScale = 0.5;
     const heartsX = (canvasW - (4 * 4 * px + 3 * px)) / 2;
-    drawHearts(ctx, state.hunger, 4, heartsX, y, px, pixel, ghost);
+    if (showScore && gameScore) {
+      const line = gameScore.wins >= 3 ? `WON ${gameScore.wins}/5` : `${gameScore.wins}/5`;
+      drawText(ctx, line, (canvasW - textWidth(line, px, scoreScale)) / 2, y, px, pixel, scoreScale);
+    } else {
+      drawHearts(ctx, state.hunger, 4, heartsX, y, px, pixel, ghost);
+    }
     y += heartRowH + gap;
 
     // Happiness hearts
     drawHearts(ctx, state.happiness, 4, heartsX, y, px, pixel, ghost);
     y += heartRowH + gap;
 
+    if (showScore && gameScore && gameScore.wins >= 3) {
+      drawConfetti(ctx, canvasW, px, celebrateFrame, iconRowH + gap, spriteH + gap + heartRowH + gap + heartRowH + gap);
+    }
+
     // Bottom icon row (with highlight)
     const botHi = hoverIcon?.row === "bottom" ? hoverIcon.index : undefined;
     drawIconRow(ctx, BOTTOM_ICONS, y, canvasW, px, pixel, ghost, botHi);
-  }, [state, canvasW, canvasH, px, hoverIcon, iconRowH, gap, spriteH, heartRowH, bottomIconY, animFrame]);
+  }, [state, canvasW, canvasH, px, hoverIcon, iconRowH, gap, spriteH, heartRowH, bottomIconY, animFrame, bounce, revealAnim, feedAnim, gameScore, celebrateFrame]);
 
   // Tooltip text
   const tooltipText = hoverIcon
@@ -465,13 +741,22 @@ export default function PetDisplay({
           <div style={feedMenuStyle}>
             <button style={feedBtnStyle} onClick={async () => {
               setFeedSubmenu(false);
-              try { await feedMeal(); showToast("Meal fed!"); } catch (e) { showToast(String(e)); }
+              try { await feedMeal(); setFeedAnim({ kind: "meal", step: 0 }); showToast("Meal fed!"); } catch (e) { showToast(String(e)); }
             }}>MEAL</button>
             <button style={feedBtnStyle} onClick={async () => {
               setFeedSubmenu(false);
-              try { await feedSnack(); showToast("Snack fed!"); } catch (e) { showToast(String(e)); }
+              try { await feedSnack(); setFeedAnim({ kind: "snack", step: 0 }); showToast("Snack fed!"); } catch (e) { showToast(String(e)); }
             }}>SNACK</button>
           </div>
+        )}
+        {gameActive && (
+          <GameScreen
+            startGame={startGame}
+            playRound={playRound}
+            onClose={handleGameExit}
+            onReveal={handleReveal}
+            onGameStart={handleGameStart}
+          />
         )}
       </div>
       <InfoPanel state={state} />
@@ -732,6 +1017,7 @@ const infoMainRow: React.CSSProperties = {
   display: "flex", justifyContent: "center", gap: 10,
   fontSize: 12, fontFamily: "monospace", color: "#444",
   letterSpacing: 0.5, fontVariantNumeric: "tabular-nums",
+  whiteSpace: "nowrap",
 };
 
 const infoMetaRow: React.CSSProperties = {

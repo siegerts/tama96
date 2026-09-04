@@ -10,7 +10,6 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use rand::Rng;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -21,7 +20,7 @@ use ratatui::{
 };
 
 use tama_core::{
-    actions::{self, Choice},
+    actions::{self, Choice, GameSession, RoundOutcome},
     engine,
     persistence::{self, LockError, LockGuard},
     state::{LifeStage, PetState},
@@ -41,6 +40,7 @@ enum RunMode {
 enum InputMode {
     Normal,
     Feed,
+    Game,
     About,
 }
 
@@ -155,6 +155,7 @@ fn render_ui(
     anim_frame: u8,
     run_mode: &RunMode,
     status_msg: &str,
+    game_session: &Option<GameSession>,
 ) {
     let outer = frame.area();
 
@@ -270,6 +271,10 @@ fn render_ui(
     } else {
         match input_mode {
             InputMode::Feed => "Feed: [m]eal or [s]nack? (Esc to cancel)".to_string(),
+            InputMode::Game => {
+                let r = game_session.as_ref().map_or(1, |s| s.round + 1);
+                format!("Game: R{r}/5 — predict [a]left or [d]right (Esc to cancel)")
+            }
             InputMode::About => "Press Esc to close".to_string(),
             InputMode::Normal => {
                 if state.pending_lights_deadline.is_some() {
@@ -363,6 +368,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut anim_frame: u8 = 0;
     let mut status_msg = String::new();
     let mut status_msg_time: Option<Instant> = None;
+    let mut game_session: Option<GameSession> = None;
 
     // Helper to show a temporary status message
     let set_status = |msg: &str, status_msg: &mut String, status_msg_time: &mut Option<Instant>| {
@@ -381,7 +387,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         // Render
         terminal.draw(|frame| {
-            render_ui(frame, &state, &input_mode, anim_frame, &run_mode, &status_msg);
+            render_ui(frame, &state, &input_mode, anim_frame, &run_mode, &status_msg, &game_session);
         })?;
 
         // Poll keyboard
@@ -440,31 +446,43 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::Esc => { input_mode = InputMode::Normal; }
                         _ => {}
                     },
+                    (InputMode::Game, _) => match key.code {
+                        KeyCode::Char('a') | KeyCode::Left => {
+                            play_game_round(Choice::Left, &run_mode, client_port, &mut state, &save_path,
+                                &mut game_session, &mut input_mode, &mut status_msg, &mut status_msg_time);
+                        }
+                        KeyCode::Char('d') | KeyCode::Right => {
+                            play_game_round(Choice::Right, &run_mode, client_port, &mut state, &save_path,
+                                &mut game_session, &mut input_mode, &mut status_msg, &mut status_msg_time);
+                        }
+                        KeyCode::Esc => {
+                            game_session = None;
+                            input_mode = InputMode::Normal;
+                        }
+                        _ => {}
+                    },
                     // ── Normal mode ──
                     (InputMode::Normal, _) => match key.code {
                         KeyCode::Char('q') => break,
                         KeyCode::Char('a') => { input_mode = InputMode::About; }
                         KeyCode::Char('f') => { input_mode = InputMode::Feed; }
                         KeyCode::Char('g') => {
-                            let mut rng = rand::thread_rng();
-                            let moves: [Choice; 5] = std::array::from_fn(|_| {
-                                if rng.gen_bool(0.5) { Choice::Left } else { Choice::Right }
-                            });
                             match &run_mode {
                                 RunMode::Standalone => {
-                                    match actions::play_game(&mut state, moves) {
-                                        Ok(r) => {
-                                            persistence::save(&state, &save_path)?;
-                                            set_status(&format!("game: {}/{} wins", r.wins, r.rounds), &mut status_msg, &mut status_msg_time);
-                                        }
+                                    match actions::start_game(&state) {
+                                        Ok(s) => { game_session = Some(s); input_mode = InputMode::Game; }
                                         Err(e) => set_status(&format!("{e:?}"), &mut status_msg, &mut status_msg_time),
                                     }
                                 }
                                 RunMode::Client => {
                                     if let Some(port) = client_port {
-                                        let params = serde_json::json!({"moves": moves});
-                                        match send_action(port, "play_game", Some(params)) {
-                                            Ok(_) => set_status("game played", &mut status_msg, &mut status_msg_time),
+                                        match send_action(port, "start_game", None) {
+                                            Ok(resp) => {
+                                                match resp.get("session").and_then(|v| serde_json::from_value(v.clone()).ok()) {
+                                                    Some(s) => { game_session = Some(s); input_mode = InputMode::Game; }
+                                                    None => set_status("start_game: no session in response", &mut status_msg, &mut status_msg_time),
+                                                }
+                                            }
                                             Err(e) => set_status(&e, &mut status_msg, &mut status_msg_time),
                                         }
                                     } else {
@@ -576,6 +594,114 @@ fn handle_simple_action(
                 set_status("no app connection", status_msg, status_msg_time);
             }
         }
+    }
+}
+
+fn play_game_round(
+    choice: Choice,
+    run_mode: &RunMode,
+    client_port: Option<u16>,
+    state: &mut PetState,
+    save_path: &std::path::Path,
+    game_session: &mut Option<GameSession>,
+    input_mode: &mut InputMode,
+    status_msg: &mut String,
+    status_msg_time: &mut Option<Instant>,
+) {
+    let set_status = |msg: &str, sm: &mut String, smt: &mut Option<Instant>| {
+        *sm = msg.to_string();
+        *smt = Some(Instant::now());
+    };
+
+    let Some(session) = game_session.take() else {
+        set_status("no active game", status_msg, status_msg_time);
+        *input_mode = InputMode::Normal;
+        return;
+    };
+    let mut session = session;
+
+    match run_mode {
+        RunMode::Standalone => {
+            match actions::play_round(state, &mut session, choice) {
+                Ok(outcome) => report_game_outcome(outcome, session, run_mode, state, save_path,
+                    game_session, input_mode, status_msg, status_msg_time),
+                Err(e) => {
+                    set_status(&format!("{e:?}"), status_msg, status_msg_time);
+                    *input_mode = InputMode::Normal;
+                }
+            }
+        }
+        RunMode::Client => {
+            if let Some(port) = client_port {
+                let params = serde_json::json!({ "session": session, "choice": choice });
+                match send_action(port, "play_round", Some(params)) {
+                    Ok(resp) => {
+                        match resp.get("outcome").and_then(|v| serde_json::from_value(v.clone()).ok()) {
+                            Some(outcome) => {
+                                let server_session: Option<GameSession> = resp
+                                    .get("session")
+                                    .and_then(|v| serde_json::from_value(v.clone()).ok());
+                                let next_session = server_session.unwrap_or(session);
+                                report_game_outcome(outcome, next_session, run_mode, state, save_path,
+                                    game_session, input_mode, status_msg, status_msg_time);
+                            }
+                            None => {
+                                set_status("play_round: no outcome in response", status_msg, status_msg_time);
+                                *input_mode = InputMode::Normal;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        set_status(&e, status_msg, status_msg_time);
+                        *input_mode = InputMode::Normal;
+                    }
+                }
+            } else {
+                set_status("no app connection", status_msg, status_msg_time);
+                *input_mode = InputMode::Normal;
+            }
+        }
+    }
+}
+
+fn report_game_outcome(
+    outcome: RoundOutcome,
+    session: GameSession,
+    run_mode: &RunMode,
+    state: &mut PetState,
+    save_path: &std::path::Path,
+    game_session: &mut Option<GameSession>,
+    input_mode: &mut InputMode,
+    status_msg: &mut String,
+    status_msg_time: &mut Option<Instant>,
+) {
+    let set_status = |msg: &str, sm: &mut String, smt: &mut Option<Instant>| {
+        *sm = msg.to_string();
+        *smt = Some(Instant::now());
+    };
+
+    if outcome.finished {
+        *game_session = None;
+        *input_mode = InputMode::Normal;
+        if matches!(run_mode, RunMode::Standalone) {
+            if let Err(e) = persistence::save(state, save_path) {
+                set_status(&format!("save error: {e}"), status_msg, status_msg_time);
+                return;
+            }
+        }
+        if outcome.happiness_gained > 0 {
+            set_status(&format!("game: {}/5 wins (+{} ❤, weight {})", outcome.wins, outcome.happiness_gained, outcome.weight), status_msg, status_msg_time);
+        } else {
+            set_status(&format!("game: {}/5 wins (weight {})", outcome.wins, outcome.weight), status_msg, status_msg_time);
+        }
+    } else {
+        *game_session = Some(session);
+        let dir = match outcome.pet_choice {
+            Choice::Left => "LEFT",
+            Choice::Right => "RIGHT",
+        };
+        let mark = if outcome.won { "✓ WIN" } else { "✗ miss" };
+        set_status(&format!("R{}: pet went {} — {} ({}/5 wins)", outcome.round, dir, mark, outcome.wins), status_msg, status_msg_time);
     }
 }
 

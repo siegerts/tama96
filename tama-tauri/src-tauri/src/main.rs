@@ -90,6 +90,8 @@ fn main() {
             commands::feed_meal,
             commands::feed_snack,
             commands::play_game,
+            commands::start_game,
+            commands::play_round,
             commands::discipline,
             commands::give_medicine,
             commands::clean_poop,

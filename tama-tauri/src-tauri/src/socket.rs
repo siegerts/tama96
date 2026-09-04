@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 
-use tama_core::actions::{self, Choice};
+use tama_core::actions::{self, Choice, GameSession, RoundOutcome};
 use tama_core::permissions;
 use tama_core::persistence;
 use tama_core::state::{ActionType, PetState};
@@ -27,7 +27,16 @@ struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     state: Option<PetState>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    session: Option<GameSession>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    outcome: Option<RoundOutcome>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+}
+
+enum GameActionResult {
+    Session(GameSession),
+    Outcome(GameSession, RoundOutcome),
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -50,6 +59,8 @@ fn ok_response(state: PetState) -> Response {
     Response {
         ok: true,
         state: Some(state),
+        session: None,
+        outcome: None,
         error: None,
     }
 }
@@ -58,8 +69,14 @@ fn err_response(msg: impl Into<String>) -> Response {
     Response {
         ok: false,
         state: None,
+        session: None,
+        outcome: None,
         error: Some(msg.into()),
     }
+}
+
+fn state_snapshot(pet: &SharedPetState) -> Option<PetState> {
+    pet.lock().ok().map(|s| s.clone())
 }
 
 fn save_and_snapshot(pet: &SharedPetState) -> Result<PetState, String> {
@@ -74,6 +91,8 @@ fn action_type_for(action: &str) -> Option<ActionType> {
         "feed_meal" => Some(ActionType::FeedMeal),
         "feed_snack" => Some(ActionType::FeedSnack),
         "play_game" => Some(ActionType::PlayGame),
+        "start_game" => Some(ActionType::PlayGame),
+        "play_round" => Some(ActionType::PlayGame),
         "discipline" => Some(ActionType::Discipline),
         "give_medicine" => Some(ActionType::GiveMedicine),
         "clean_poop" => Some(ActionType::CleanPoop),
@@ -110,6 +129,75 @@ fn handle_request(
     }
 
     // Execute action
+    if req.action == "start_game" || req.action == "play_round" {
+        let game_result = match req.action.as_str() {
+            "start_game" => {
+                let state = match pet.lock() {
+                    Ok(s) => s.clone(),
+                    Err(e) => return err_response(format!("lock error: {e}")),
+                };
+                match actions::start_game(&state) {
+                    Ok(session) => GameActionResult::Session(session),
+                    Err(e) => return err_response(format!("{e:?}")),
+                }
+            }
+            _ => {
+                let session: GameSession = match serde_json::from_value(
+                    req.params.get("session").cloned().unwrap_or_default(),
+                ) {
+                    Ok(s) => s,
+                    Err(e) => return err_response(format!("invalid session param: {e}")),
+                };
+                let choice: Choice = match serde_json::from_value(
+                    req.params.get("choice").cloned().unwrap_or_default(),
+                ) {
+                    Ok(c) => c,
+                    Err(e) => return err_response(format!("invalid choice param: {e}")),
+                };
+                let mut state = match pet.lock() {
+                    Ok(s) => s,
+                    Err(e) => return err_response(format!("lock error: {e}")),
+                };
+                let mut sess = session;
+                match actions::play_round(&mut state, &mut sess, choice) {
+                    Ok(outcome) => GameActionResult::Outcome(sess, outcome),
+                    Err(e) => return err_response(format!("{e:?}")),
+                }
+            }
+        };
+
+        if let Ok(mut p) = perms.lock() {
+            permissions::log_action(&mut p, action_type, now);
+        }
+
+        return match game_result {
+            GameActionResult::Session(session) => Response {
+                ok: true,
+                state: state_snapshot(pet),
+                session: Some(session),
+                outcome: None,
+                error: None,
+            },
+            GameActionResult::Outcome(session, outcome) => {
+                let state = if outcome.finished {
+                    match save_and_snapshot(pet) {
+                        Ok(s) => Some(s),
+                        Err(e) => return err_response(format!("save error: {e}")),
+                    }
+                } else {
+                    state_snapshot(pet)
+                };
+                Response {
+                    ok: true,
+                    state,
+                    session: Some(session),
+                    outcome: Some(outcome),
+                    error: None,
+                }
+            }
+        };
+    }
+
     let result = match req.action.as_str() {
         "get_status" => {
             let state = match pet.lock() {

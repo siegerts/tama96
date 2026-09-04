@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use tauri::State;
 
-use tama_core::actions::{self, Choice, GameResult};
+use tama_core::actions::{self, Choice, GameResult, GameSession, RoundOutcome};
 use tama_core::permissions;
 use tama_core::persistence;
 use tama_core::state::{AgentPermissions, PetState};
@@ -84,6 +84,29 @@ pub fn play_game(
     // Save after the game
     save_and_snapshot(&pet)?;
     Ok(game_result)
+}
+
+#[tauri::command]
+pub fn start_game(pet: State<'_, SharedPetState>) -> Result<GameSession, String> {
+    let state = pet.lock().map_err(|e| e.to_string())?;
+    actions::start_game(&state).map_err(|e| format!("{e:?}"))
+}
+
+#[tauri::command]
+pub fn play_round(
+    pet: State<'_, SharedPetState>,
+    session: GameSession,
+    choice: Choice,
+) -> Result<RoundOutcome, String> {
+    let outcome = {
+        let mut state = pet.lock().map_err(|e| e.to_string())?;
+        let mut sess = session;
+        actions::play_round(&mut state, &mut sess, choice).map_err(|e| format!("{e:?}"))?
+    };
+    if outcome.finished {
+        save_and_snapshot(&pet)?;
+    }
+    Ok(outcome)
 }
 
 #[tauri::command]

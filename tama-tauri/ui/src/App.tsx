@@ -35,7 +35,7 @@ function loadShellColor(): string {
 function App() {
   const {
     state, loading, error,
-    feedMeal, feedSnack, playGame, discipline,
+    feedMeal, feedSnack, startGame, playRound, discipline,
     giveMedicine, cleanPoop, toggleLights, hatchNewEgg,
   } = usePetState();
   const [showSettings, setShowSettings] = useState(false);
@@ -83,11 +83,12 @@ function App() {
           state={state}
           feedMeal={feedMeal}
           feedSnack={feedSnack}
-          playGame={playGame}
           discipline={discipline}
           giveMedicine={giveMedicine}
           cleanPoop={cleanPoop}
           toggleLights={toggleLights}
+          startGame={startGame}
+          playRound={playRound}
         />
       )}
 
