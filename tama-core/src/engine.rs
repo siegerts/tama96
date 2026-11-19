@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Timelike, Utc};
+use chrono::{DateTime, Duration, Local, Timelike, Utc};
 use rand::Rng;
 
 use crate::characters::CharacterStats;
@@ -102,7 +102,7 @@ pub fn check_care_deadlines(state: &mut PetState, now: DateTime<Utc>) {
 ///   `pending_lights_deadline` (if none exists) so the player can turn them off.
 /// - If the pet should be sleeping and lights are already off: sets `is_sleeping = true`.
 pub fn check_sleep(state: &mut PetState, stats: &CharacterStats, now: DateTime<Utc>) {
-    let hour = now.hour() as u8;
+    let hour = now.with_timezone(&Local).hour() as u8;
 
     let should_sleep = if stats.sleep_hour > stats.wake_hour {
         // Sleep window spans midnight: e.g. sleep_hour=21, wake_hour=9
@@ -129,7 +129,7 @@ pub fn check_sleep(state: &mut PetState, stats: &CharacterStats, now: DateTime<U
 /// wakes the pet up: sets `is_sleeping = false`, `lights_on = true`,
 /// increments `age` by 1 (1 day = 1 year), and resets `snack_count_since_last_tick`.
 pub fn check_wake(state: &mut PetState, stats: &CharacterStats, now: DateTime<Utc>) {
-    let hour = now.hour() as u8;
+    let hour = now.with_timezone(&Local).hour() as u8;
 
     let should_be_awake = if stats.sleep_hour > stats.wake_hour {
         // Normal: awake window is wake_hour..sleep_hour
