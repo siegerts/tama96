@@ -57,7 +57,7 @@ import Base from '../layouts/Base.astro';
   </section>
 
   <section>
-    <h2>Evolution</h2>
+    <h2 id="evolution">Evolution</h2>
     <pre>Egg (5min) → Babytchi (65min) → Marutchi (age 3) → Teen (age 6) → Adult
 
 Teen: care_mistakes 0-2 → Tamatchi, 3+ → Kuchitamatchi
@@ -67,7 +67,7 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
   </section>
 
   <section>
-    <h2>MCP / AI agent</h2>
+    <h2 id="mcp">MCP / AI agent</h2>
     <p>Open <strong>Connect Codex → Add to Codex</strong> in tama96. Setup uses your local Codex CLI and Node.js 18 or newer. Keep tama96 open, start a new Codex chat, and ask “How is my tama96 pet doing?”</p>
     <p>For manual Codex setup, choose <strong>Manual setup → Copy TOML</strong>. For JSON-based clients, choose <strong>Other clients → Copy JSON</strong> and merge the server entry into your MCP configuration.</p>
     <p>Agent permissions are configurable per-action with rate limits. The master switch disables all agent access.</p>
@@ -104,6 +104,7 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
     h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 36px; }
     section { margin-bottom: 36px; }
     h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 10px; }
+    h2[id] { scroll-margin-top: 72px; }
     h3 { font-size: 14px; font-weight: 500; color: #8a9470; margin: 14px 0 8px; }
     p { color: var(--text-secondary); margin-bottom: 10px; font-size: 14px; line-height: 1.7; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
