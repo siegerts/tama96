@@ -1,4 +1,5 @@
 use crate::state::Character;
+use chrono::{DateTime, Local, Timelike, Utc};
 
 pub struct CharacterStats {
     pub sleep_hour: u8,
@@ -11,6 +12,15 @@ pub struct CharacterStats {
 }
 
 impl CharacterStats {
+    pub(crate) fn is_sleep_time(&self, instant: DateTime<Utc>) -> bool {
+        let hour = instant.with_timezone(&Local).hour() as u8;
+        if self.sleep_hour > self.wake_hour {
+            hour >= self.sleep_hour || hour < self.wake_hour
+        } else {
+            (self.sleep_hour..self.wake_hour).contains(&hour)
+        }
+    }
+
     pub fn for_character(c: &Character) -> Self {
         match c {
             Character::Babytchi => CharacterStats {

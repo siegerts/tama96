@@ -1,4 +1,4 @@
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -253,18 +253,7 @@ pub fn toggle_lights(state: &mut PetState, now: DateTime<Utc>) -> Result<ActionR
 
         // Check if pet should be sleeping based on character sleep/wake hours
         let stats = CharacterStats::for_character(&state.character);
-        let hour = now.hour() as u8;
-
-        let should_sleep = if stats.sleep_hour > stats.wake_hour {
-            // Normal case: sleep_hour (e.g. 21) > wake_hour (e.g. 9)
-            // Sleep window spans midnight: hour >= sleep_hour OR hour < wake_hour
-            hour >= stats.sleep_hour || hour < stats.wake_hour
-        } else {
-            // Edge case: sleep_hour <= wake_hour (unusual but handle it)
-            hour >= stats.sleep_hour && hour < stats.wake_hour
-        };
-
-        if should_sleep {
+        if stats.is_sleep_time(now) {
             state.is_sleeping = true;
         }
     }

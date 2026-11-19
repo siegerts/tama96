@@ -179,6 +179,41 @@ fn toggle_lights_round_trip() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn sleep_and_lights_follow_local_bedtime_and_wake_time() {
+    let local_time = |day, hour, minute| {
+        chrono::Local
+            .with_ymd_and_hms(2024, 6, day, hour, minute, 0)
+            .unwrap()
+            .to_utc()
+    };
+    let mut pet = alive_baby();
+    let stats = tama_core::characters::CharacterStats::for_character(&pet.character);
+    let evening = local_time(15, 19, 59);
+    pet.pending_lights_deadline = Some(evening - chrono::Duration::hours(1));
+    tama_core::engine::check_sleep(&mut pet, &stats, evening);
+    assert!(pet.pending_lights_deadline.is_none());
+    actions::toggle_lights(&mut pet, evening).unwrap();
+    assert!(!pet.is_sleeping);
+    actions::toggle_lights(&mut pet, evening).unwrap();
+
+    let bedtime = local_time(15, 20, 0);
+    tama_core::engine::check_sleep(&mut pet, &stats, bedtime);
+    assert_eq!(
+        pet.pending_lights_deadline,
+        Some(bedtime + chrono::Duration::minutes(15))
+    );
+    actions::toggle_lights(&mut pet, bedtime).unwrap();
+    assert!(pet.is_sleeping && pet.pending_lights_deadline.is_none());
+
+    let age = pet.age;
+    tama_core::engine::tick(&mut pet, local_time(16, 7, 59));
+    assert!(pet.is_sleeping);
+    tama_core::engine::tick(&mut pet, local_time(16, 8, 0));
+    assert!(!pet.is_sleeping && pet.lights_on);
+    assert_eq!(pet.age, age + 1);
+}
+
 // ── Dead pet actions return PetIsDead round-trip ────────────────────────────
 
 #[test]
