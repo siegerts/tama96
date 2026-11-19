@@ -26,9 +26,10 @@ const ACTION_LABELS: Record<ActionType, string> = {
 
 interface PermissionsPanelProps {
   onClose: () => void;
+  onConnect: () => void;
 }
 
-export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
+export default function PermissionsPanel({ onClose, onConnect }: PermissionsPanelProps) {
   const [permissions, setPermissions] = useState<AgentPermissions | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +109,7 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
     return (
       <div style={overlayStyle}>
         <div style={panelStyle}>
+          <button onClick={onClose} style={closeBtnStyle} aria-label="Close settings">×</button>
           <p>{error ? `Error: ${error}` : "Loading permissions…"}</p>
         </div>
       </div>
@@ -122,16 +124,7 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
           <button onClick={onClose} style={closeBtnStyle} aria-label="Close settings">✕</button>
         </div>
 
-        {/* MCP Config section */}
-        <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid #444" }}>
-          <h3 style={{ margin: "0 0 6px", fontSize: 13, fontFamily: "monospace" }}>Connect an AI tool</h3>
-          <p style={{ fontSize: 11, color: "#999", fontFamily: "monospace", margin: "0 0 8px", lineHeight: 1.5 }}>
-            Copy the config below and paste it into your AI tool's MCP settings
-            (Kiro, Cursor, etc). The app needs to be running for the
-            connection to work.
-          </p>
-          <CopyMcpConfig />
-        </div>
+        <button style={copyBtnStyle} onClick={onConnect}>Connect an AI tool</button>
 
         {/* Agent Permissions */}
         <h3 style={{ margin: "0 0 6px", fontSize: 13, fontFamily: "monospace" }}>Agent Permissions</h3>
@@ -199,63 +192,9 @@ export default function PermissionsPanel({ onClose }: PermissionsPanelProps) {
   );
 }
 
-function CopyMcpConfig() {
-  const [config, setConfig] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    invoke<string>("get_mcp_config").then(setConfig).catch(() => setConfig(null));
-  }, []);
-
-  const handleCopy = async () => {
-    if (!config) return;
-    try {
-      await navigator.clipboard.writeText(config);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-      const ta = document.createElement("textarea");
-      ta.value = config;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  if (!config) {
-    return <p style={{ fontSize: 11, color: "#666", fontFamily: "monospace" }}>MCP config not available yet. Restart the app.</p>;
-  }
-
-  return (
-    <div>
-      <pre style={configPreStyle}>{config}</pre>
-      <button onClick={handleCopy} style={copyBtnStyle}>
-        {copied ? "Copied" : "Copy to clipboard"}
-      </button>
-    </div>
-  );
-}
-
-const configPreStyle: React.CSSProperties = {
-  background: "#111",
-  border: "1px solid #444",
-  borderRadius: 4,
-  padding: 8,
-  fontSize: 10,
-  fontFamily: "monospace",
-  color: "#aaa",
-  overflowX: "auto",
-  margin: "0 0 8px",
-  whiteSpace: "pre-wrap",
-  wordBreak: "break-all",
-};
-
 const copyBtnStyle: React.CSSProperties = {
   padding: "4px 12px",
+  marginBottom: 12,
   border: "1px solid #555",
   borderRadius: 4,
   background: "#2e7d32",
@@ -279,8 +218,9 @@ const panelStyle: React.CSSProperties = {
   background: "#1e1e1e",
   border: "1px solid #555",
   borderRadius: 8,
-  padding: 20,
-  width: 360,
+  padding: 12,
+  width: "min(360px, calc(100% - 16px))",
+  boxSizing: "border-box",
   maxHeight: "80vh",
   overflowY: "auto",
   color: "#eee",
@@ -314,7 +254,7 @@ const actionRowStyle: React.CSSProperties = {
 };
 
 const rateLimitInputStyle: React.CSSProperties = {
-  width: 48,
+  width: 34,
   padding: "2px 4px",
   border: "1px solid #555",
   borderRadius: 4,

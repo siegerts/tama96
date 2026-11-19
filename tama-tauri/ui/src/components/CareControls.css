@@ -1,0 +1,65 @@
+.care-row {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  height: 47px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.care-row.top { top: 7px; }
+.care-row.bottom { bottom: 7px; }
+
+.care-row button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  color: #2d3320;
+  background: transparent;
+  cursor: pointer;
+  font: 600 10px/11px "Helvetica Neue", Arial, sans-serif;
+}
+
+.care-row button:hover,
+.care-row button[aria-expanded="true"] {
+  background: #b4bf91;
+}
+
+.care-row button:focus-visible {
+  outline: 2px solid #2d3320;
+  outline-offset: -2px;
+  background: #b4bf91;
+}
+
+.care-row button canvas {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.heart-readout {
+  position: absolute;
+  top: 167px;
+  left: 5px;
+  right: 5px;
+  height: 60px;
+  display: grid;
+  grid-template-rows: 24px 24px;
+  row-gap: 11px;
+  align-items: center;
+  color: #2d3320;
+  font: 600 10px/1 "Helvetica Neue", Arial, sans-serif;
+}
+.heart-readout span { width: 60px; text-align: center; }
+.heart-readout:focus-visible { outline: 1px dashed #525e40; border-radius: 3px; }
+@media (hover: hover) {
+  .pet-lcd:not(:has(.care-row button:hover, .care-row button:focus-visible, .heart-readout:hover, .heart-readout:focus-visible))
+  :is(.care-row button span, .heart-readout span) { opacity: 0; }
+}

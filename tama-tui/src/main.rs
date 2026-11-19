@@ -10,13 +10,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
-use rand::Rng;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
     Frame, Terminal,
 };
 
@@ -41,6 +40,8 @@ enum RunMode {
 enum InputMode {
     Normal,
     Feed,
+    Game,
+    Score(actions::GameProgress),
     About,
 }
 
@@ -93,22 +94,19 @@ fn send_action(port: u16, action: &str, params: Option<serde_json::Value>) -> Re
 // ── Display helpers ─────────────────────────────────────────────────────────
 
 fn hearts_string(filled: u8, max: u8) -> String {
-    let mut s = String::new();
-    for i in 0..max {
-        if i > 0 { s.push(' '); }
-        if i < filled {
-            s.push_str("\u{2588}\u{2588}");
-        } else {
-            s.push_str("\u{2591}\u{2591}");
-        }
-    }
-    s
+    (0..max)
+        .map(|i| if i < filled { "■" } else { "□" })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn status_indicators(state: &PetState) -> String {
     let mut parts: Vec<String> = Vec::new();
+    if state.hunger == 0 { parts.push("Hungry".into()); }
+    if state.happiness == 0 { parts.push("Wants to play".into()); }
+    if state.pending_discipline_deadline.is_some() { parts.push("Calling".into()); }
     if state.poop_count > 0 {
-        parts.push(format!("POOP:{}", "o".repeat(state.poop_count as usize)));
+        parts.push(format!("Clean up ({})", state.poop_count));
     }
     if state.pending_lights_deadline.is_some() {
         parts.push("BEDTIME".to_string());
@@ -148,154 +146,121 @@ fn stage_name(stage: &LifeStage) -> &'static str {
 
 // ── Rendering ───────────────────────────────────────────────────────────────
 
+fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height)
+}
+
 fn render_ui(
     frame: &mut Frame,
     state: &PetState,
     input_mode: &InputMode,
-    anim_frame: u8,
+    pose: &sprites::PetFrame,
     run_mode: &RunMode,
     status_msg: &str,
 ) {
     let outer = frame.area();
+    let wide = outer.width >= 52 && outer.height >= 16;
+    let area = centered(outer, 60, if wide { 18 } else { 19 });
+    let [header, body, status, keys] = Layout::vertical([
+        Constraint::Length(1), Constraint::Min(3), Constraint::Length(2), Constraint::Length(if area.width < 42 { 4 } else { 3 })
+    ]).areas(area);
+    let mode = match run_mode {
+        RunMode::Standalone => "Standalone",
+        RunMode::Client => "Desktop client",
+    };
+    let bold = Style::default().add_modifier(Modifier::BOLD);
+    frame.render_widget(Paragraph::new(" tama96").style(bold), header);
+    frame.render_widget(Paragraph::new(format!("{mode} ")).alignment(Alignment::Right), header);
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),  // header
-            Constraint::Length(6),  // sprite
-            Constraint::Length(6),  // meters
-            Constraint::Length(3),  // status
-            Constraint::Length(1),  // mode indicator
-            Constraint::Min(1),    // keybinds / messages
-        ])
-        .split(outer);
-
-    // ── Header ──
-    let header_text = if state.is_alive {
-        format!(
-            "{} — {} (Age {})",
-            character_name(state), stage_name(&state.stage), state.age
-        )
+    let lcd = Style::default().fg(Color::Rgb(45, 51, 32)).bg(Color::Rgb(192, 203, 155));
+    frame.render_widget(Block::default().style(lcd), body);
+    let name = if state.stage == LifeStage::Egg { "Egg" } else { character_name(state) };
+    let subtitle = if state.is_alive {
+        format!("{} · age {} · {} lb", stage_name(&state.stage), state.age, state.weight)
     } else {
-        format!("{} — R.I.P. (Age {})", character_name(state), state.age)
+        format!("R.I.P. · age {}", state.age)
     };
-    let header = Paragraph::new(header_text)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::BOTTOM));
-    frame.render_widget(header, chunks[0]);
-
-    // ── Sprite with idle animation ──
-    let sprite_text = sprites::get_sprite(state);
-    let animated_sprite = if state.is_alive && !state.is_sleeping && !state.is_sick {
-        let pad = match anim_frame % 4 {
-            0 => "", 1 => " ", 2 => "", _ => "  ",
-        };
-        sprite_text.lines().map(|l| format!("{}{}", pad, l)).collect::<Vec<_>>().join("\n")
+    let meter = |label, value| Line::from(format!("{label:<10}{}", hearts_string(value, 4)));
+    let show_score = matches!(input_mode, InputMode::Score(_));
+    let game = match input_mode {
+        InputMode::Score(finished) => finished,
+        _ => &state.game,
+    };
+    let playing = matches!(input_mode, InputMode::Game | InputMode::Score(_));
+    let round = game.turn % 5;
+    let info = if playing {
+        let heading = if show_score { "Final score".to_owned() }
+            else { format!("Round {} of 5", round + 1) };
+        let hits = if *input_mode == InputMode::Game && round == 0 { 0 } else { game.hits };
+        let last = if show_score {
+            format!("{} · {}", if game.look == Some(Choice::Left) { "← Left" } else { "Right →" }, if game.matched { "Match!" } else { "Miss" })
+        } else { String::new() };
+        vec![Line::styled("Left or right?", bold), Line::from(heading), Line::from(last),
+             Line::from(format!("Matches    {hits}/5")), Line::from(format!("Stars      {}", game.stars)),
+             Line::from(format!("Best       {}/5", game.best))]
+    } else { vec![
+        Line::styled(name, bold), Line::from(subtitle), Line::from(""),
+        meter("Hunger", state.hunger), meter("Happiness", state.happiness),
+        Line::from(format!("Discipline  {}%", state.discipline)),
+    ] };
+    let facing_right = playing && (round != 0 || show_score) && game.look == Some(Choice::Right);
+    if wide {
+        let [left, right] = Layout::horizontal([Constraint::Percentage(45), Constraint::Fill(1)]).areas(body);
+        let sprite = Paragraph::new(pose.render(true, facing_right)).style(lcd).alignment(Alignment::Center);
+        frame.render_widget(sprite, centered(left, left.width, 8));
+        frame.render_widget(Paragraph::new(info).style(lcd), centered(right, right.width, 6));
     } else {
-        sprite_text.clone()
-    };
-    let sprite = Paragraph::new(animated_sprite)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::NONE));
-    frame.render_widget(sprite, chunks[1]);
+        let [sprite, details] = Layout::vertical([Constraint::Max(4), Constraint::Min(4)]).areas(body);
+        frame.render_widget(Paragraph::new(pose.render(false, facing_right)).style(lcd).alignment(Alignment::Center), sprite);
+        frame.render_widget(Paragraph::new(info).style(lcd), centered(details, 26, 6));
+    }
 
-    // ── Meters ──
-    let meter_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
-        .margin(1)
-        .split(chunks[2]);
-
-    let hunger_line = Line::from(vec![
-        Span::styled("Hunger:    ", Style::default().fg(Color::Yellow)),
-        Span::styled(hearts_string(state.hunger, 4), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-    ]);
-    frame.render_widget(Paragraph::new(hunger_line), meter_chunks[0]);
-
-    let happy_line = Line::from(vec![
-        Span::styled("Happiness: ", Style::default().fg(Color::Yellow)),
-        Span::styled(hearts_string(state.happiness, 4), Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
-    ]);
-    frame.render_widget(Paragraph::new(happy_line), meter_chunks[1]);
-
-    let disc_ratio = state.discipline as f64 / 100.0;
-    let gauge = Gauge::default()
-        .gauge_style(Style::default().fg(Color::Cyan).bg(Color::DarkGray))
-        .ratio(disc_ratio)
-        .label(format!("Discipline: {}%", state.discipline));
-    frame.render_widget(gauge, meter_chunks[2]);
-
-    let info_line = Line::from(vec![
-        Span::styled(
-            format!("Age: {} yr   Weight: {} lb", state.age, state.weight),
-            Style::default().fg(Color::White),
-        ),
-    ]);
-    frame.render_widget(Paragraph::new(info_line), meter_chunks[3]);
-
-    // ── Status indicators ──
-    let indicators = status_indicators(state);
-    let status_text = if indicators.is_empty() {
-        "Status: OK".to_string()
+    let conditions = status_indicators(state);
+    let message = if !status_msg.is_empty() {
+        status_msg.to_owned()
+    } else if playing {
+        if show_score {
+            format!("{} stars earned · {}", game.hits,
+                if game.stars >= 3 { "3D unlocked in desktop Game" } else { "3 stars unlock 3D" })
+        } else if round != 0 {
+            format!("Looked {} · {}", if game.look == Some(Choice::Left) { "left ←" } else { "right →" },
+                if game.matched { "Match!" } else { "Miss" })
+        } else { "Which way will your pet look?".into() }
+    } else if !state.is_alive {
+        "Your pet has passed away.".to_owned()
+    } else if state.pending_lights_deadline.is_some() {
+        format!("{conditions} · Press l for lights")
+    } else if !conditions.is_empty() {
+        conditions
+    } else if state.stage == LifeStage::Egg {
+        "Waiting to hatch".to_owned()
     } else {
-        format!("Status: {}", indicators)
+        "Feeling well".to_owned()
     };
-    let status = Paragraph::new(status_text)
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::TOP));
-    frame.render_widget(status, chunks[3]);
-
-    // ── Mode indicator ──
-    let mode_text = match run_mode {
-        RunMode::Standalone => "[ standalone — owns simulation ]",
-        RunMode::Client => "[ client — app is running, actions sent via network ]",
+    frame.render_widget(Paragraph::new(message).alignment(Alignment::Center).wrap(Wrap { trim: true }), status);
+    let key = |letter: &'static str, action: &'static str| [Span::styled(letter, bold), Span::raw(action)];
+    let hints = match input_mode {
+        InputMode::Feed => vec![Line::from("Feed your pet"), Line::from([key("m", " meal   "), key("s", " snack   "), key("Esc", " cancel")].concat())],
+        InputMode::Game => vec![Line::from("← left     → right"), Line::from("Esc to pause")],
+        InputMode::Score(_) => vec![Line::from("Enter to play again"), Line::from("Esc to close")],
+        InputMode::About => vec![Line::from("Esc to close")],
+        InputMode::Normal => vec![
+            Line::from([key("f", " feed   "), key("g", " game   "), key("c", " clean   "), key("i", " medicine")].concat()),
+            Line::from([key("l", " lights   "), key("d", " discipline   "), key("a", " about   "), key("q", " quit")].concat()),
+        ],
     };
-    let mode_color = match run_mode {
-        RunMode::Standalone => Color::Green,
-        RunMode::Client => Color::Cyan,
-    };
-    let mode_line = Paragraph::new(mode_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(mode_color));
-    frame.render_widget(mode_line, chunks[4]);
-
-    // ── Keybind hints / status message ──
-    let hints_text = if !status_msg.is_empty() {
-        status_msg.to_string()
-    } else {
-        match input_mode {
-            InputMode::Feed => "Feed: [m]eal or [s]nack? (Esc to cancel)".to_string(),
-            InputMode::About => "Press Esc to close".to_string(),
-            InputMode::Normal => {
-                if state.pending_lights_deadline.is_some() {
-                    "BEDTIME: press l to turn the lights off".to_string()
-                } else {
-                    "f:feed  g:game  d:discipline  c:clean  l:lights  i:med  a:about  q:quit".to_string()
-                }
-            }
-        }
-    };
-    let hints = Paragraph::new(hints_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::DarkGray));
-    frame.render_widget(hints, chunks[5]);
+    frame.render_widget(Paragraph::new(hints).alignment(Alignment::Center).wrap(Wrap { trim: true }), keys);
 
     // ── About overlay ──
     if *input_mode == InputMode::About {
         let about_text = vec![
             Line::from(""),
-            Line::from(Span::styled("tama96 v0.1.0", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(concat!("tama96 v", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
             Line::from(""),
             Line::from(Span::styled("Made by @siegerts", Style::default().fg(Color::Cyan))),
             Line::from(Span::styled("https://x.com/siegerts", Style::default().fg(Color::DarkGray))),
-            Line::from(""),
-            Line::from(Span::styled("Built with Kiro", Style::default().fg(Color::Cyan))),
-            Line::from(Span::styled("https://kiro.dev/", Style::default().fg(Color::DarkGray))),
             Line::from(""),
             Line::from(Span::styled("https://github.com/siegerts/tama96", Style::default().fg(Color::DarkGray))),
             Line::from(""),
@@ -335,13 +300,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Err(LockError::Io(e)) => return Err(format!("lockfile error: {e}").into()),
     };
 
-    // In client mode, find the app's TCP port
-    let client_port: Option<u16> = if run_mode == RunMode::Client {
-        read_port()
-    } else {
-        None
-    };
-
     // Load initial state
     let now = Utc::now();
     let mut state: PetState = if save_path.exists() {
@@ -360,7 +318,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
     let mut last_file_reload = Instant::now();
     let mut input_mode = InputMode::Normal;
-    let mut anim_frame: u8 = 0;
+    let mut motion_start = Instant::now();
+    let mut last_stage = state.stage_start_time;
+    let mut last_weight = state.weight;
+    let mut last_bite: Option<Instant> = None;
     let mut status_msg = String::new();
     let mut status_msg_time: Option<Instant> = None;
 
@@ -379,14 +340,36 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        if state.stage_start_time != last_stage || state.is_sleeping || state.is_sick {
+            last_bite = None;
+            motion_start = Instant::now();
+        } else if state.weight > last_weight {
+            // Both local and remote meals/snacks increase weight, even at full hearts.
+            last_bite = Some(Instant::now());
+        }
+        last_stage = state.stage_start_time;
+        last_weight = state.weight;
+        let bite_left = last_bite.map_or(Duration::ZERO, |t| {
+            Duration::from_millis(450).saturating_sub(t.elapsed())
+        });
+        let pose = sprites::pet_frame(&state, motion_start.elapsed(), bite_left);
+        let until_update = match run_mode {
+            RunMode::Standalone => tick_interval.saturating_sub(last_tick.elapsed()),
+            RunMode::Client => Duration::from_secs(1).saturating_sub(last_file_reload.elapsed()),
+        };
+        let wait = pose.redraw_after.min(until_update);
+
         // Render
         terminal.draw(|frame| {
-            render_ui(frame, &state, &input_mode, anim_frame, &run_mode, &status_msg);
+            render_ui(frame, &state, &input_mode, &pose, &run_mode, &status_msg);
         })?;
 
         // Poll keyboard
-        if event::poll(Duration::from_secs(1))? {
+        if event::poll(wait)? {
             if let Event::Key(key) = event::read()? {
+                if key.kind != event::KeyEventKind::Press { continue; }
+                // The desktop can publish its port after this terminal has opened.
+                let client_port = if run_mode == RunMode::Client { read_port() } else { None };
                 match (&input_mode, &run_mode) {
                     // ── About mode ──
                     (InputMode::About, _) => match key.code {
@@ -399,14 +382,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     (InputMode::Feed, RunMode::Standalone) => match key.code {
                         KeyCode::Char('m') => {
                             match actions::feed_meal(&mut state) {
-                                Ok(_) => { persistence::save(&state, &save_path)?; }
+                                Ok(_) => {
+                                    persistence::save(&state, &save_path)?;
+                                    set_status("Meal eaten", &mut status_msg, &mut status_msg_time);
+                                }
                                 Err(e) => set_status(&format!("{e:?}"), &mut status_msg, &mut status_msg_time),
                             }
                             input_mode = InputMode::Normal;
                         }
                         KeyCode::Char('s') => {
                             match actions::feed_snack(&mut state) {
-                                Ok(_) => { persistence::save(&state, &save_path)?; }
+                                Ok(_) => {
+                                    persistence::save(&state, &save_path)?;
+                                    set_status("Snack eaten", &mut status_msg, &mut status_msg_time);
+                                }
                                 Err(e) => set_status(&format!("{e:?}"), &mut status_msg, &mut status_msg_time),
                             }
                             input_mode = InputMode::Normal;
@@ -415,21 +404,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         _ => {}
                     },
                     (InputMode::Feed, RunMode::Client) => match key.code {
-                        KeyCode::Char('m') => {
-                            if let Some(port) = client_port {
-                                match send_action(port, "feed_meal", None) {
-                                    Ok(_) => set_status("meal sent", &mut status_msg, &mut status_msg_time),
-                                    Err(e) => set_status(&e, &mut status_msg, &mut status_msg_time),
-                                }
+                        KeyCode::Char(key @ ('m' | 's')) => {
+                            let (action, message) = if key == 'm' {
+                                ("feed_meal", "meal sent")
                             } else {
-                                set_status("no app connection", &mut status_msg, &mut status_msg_time);
-                            }
-                            input_mode = InputMode::Normal;
-                        }
-                        KeyCode::Char('s') => {
+                                ("feed_snack", "snack sent")
+                            };
                             if let Some(port) = client_port {
-                                match send_action(port, "feed_snack", None) {
-                                    Ok(_) => set_status("snack sent", &mut status_msg, &mut status_msg_time),
+                                match send_action(port, action, None) {
+                                    Ok(mut response) => {
+                                        if let Ok(snapshot) = serde_json::from_value(response["state"].take()) {
+                                            state = snapshot;
+                                        }
+                                        set_status(message, &mut status_msg, &mut status_msg_time);
+                                    }
                                     Err(e) => set_status(&e, &mut status_msg, &mut status_msg_time),
                                 }
                             } else {
@@ -440,38 +428,48 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::Esc => { input_mode = InputMode::Normal; }
                         _ => {}
                     },
+                    (InputMode::Game, _) => match key.code {
+                        KeyCode::Esc | KeyCode::Char('q') => { input_mode = InputMode::Normal; }
+                        KeyCode::Left | KeyCode::Right => {
+                            let guess = actions::Guess {
+                                choice: if key.code == KeyCode::Left { Choice::Left } else { Choice::Right },
+                                birth_time: state.birth_time,
+                                turn: state.game.turn,
+                            };
+                            let outcome = match run_mode {
+                                RunMode::Standalone => {
+                                    let mut next = state.clone();
+                                    actions::guess_direction(&mut next, guess).map_err(|e| format!("{e:?}"))
+                                        .and_then(|_| persistence::save(&next, &save_path).map(|_| next).map_err(|e| e.to_string()))
+                                }
+                                RunMode::Client => client_port.ok_or_else(|| "No desktop connection".to_owned())
+                                    .and_then(|port| send_action(port, "guess_direction", Some(serde_json::json!(guess))))
+                                    .and_then(|mut response| serde_json::from_value(response["state"].take()).map_err(|e| e.to_string())),
+                            };
+                            match outcome {
+                                Ok(next) => {
+                                    state = next;
+                                    status_msg.clear();
+                                    if state.game.turn % 5 == 0 { input_mode = InputMode::Score(state.game.clone()); }
+                                }
+                                Err(e) => set_status(&e, &mut status_msg, &mut status_msg_time),
+                            }
+                        }
+                        _ => {}
+                    },
+                    (InputMode::Score(_), _) => match key.code {
+                        KeyCode::Enter => { input_mode = InputMode::Game; }
+                        KeyCode::Esc | KeyCode::Char('q') => { input_mode = InputMode::Normal; }
+                        _ => {}
+                    },
                     // ── Normal mode ──
                     (InputMode::Normal, _) => match key.code {
                         KeyCode::Char('q') => break,
                         KeyCode::Char('a') => { input_mode = InputMode::About; }
                         KeyCode::Char('f') => { input_mode = InputMode::Feed; }
                         KeyCode::Char('g') => {
-                            let mut rng = rand::thread_rng();
-                            let moves: [Choice; 5] = std::array::from_fn(|_| {
-                                if rng.gen_bool(0.5) { Choice::Left } else { Choice::Right }
-                            });
-                            match &run_mode {
-                                RunMode::Standalone => {
-                                    match actions::play_game(&mut state, moves) {
-                                        Ok(r) => {
-                                            persistence::save(&state, &save_path)?;
-                                            set_status(&format!("game: {}/{} wins", r.wins, r.rounds), &mut status_msg, &mut status_msg_time);
-                                        }
-                                        Err(e) => set_status(&format!("{e:?}"), &mut status_msg, &mut status_msg_time),
-                                    }
-                                }
-                                RunMode::Client => {
-                                    if let Some(port) = client_port {
-                                        let params = serde_json::json!({"moves": moves});
-                                        match send_action(port, "play_game", Some(params)) {
-                                            Ok(_) => set_status("game played", &mut status_msg, &mut status_msg_time),
-                                            Err(e) => set_status(&e, &mut status_msg, &mut status_msg_time),
-                                        }
-                                    } else {
-                                        set_status("no app connection", &mut status_msg, &mut status_msg_time);
-                                    }
-                                }
-                            }
+                            status_msg.clear();
+                            input_mode = InputMode::Game;
                         }
                         KeyCode::Char('d') => {
                             handle_simple_action("discipline", &run_mode, client_port, &mut state, &save_path,
@@ -525,8 +523,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             last_file_reload = Instant::now();
         }
-
-        anim_frame = anim_frame.wrapping_add(1);
     }
 
     // Cleanup
@@ -585,5 +581,29 @@ fn main() {
         let _ = io::stdout().execute(LeaveAlternateScreen);
         eprintln!("tama-tui error: {e}");
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+
+    #[test]
+    fn feed_choices_remain_visible_during_action_feedback() {
+        let pet = PetState::new_egg(Utc::now());
+        let pose = sprites::pet_frame(&pet, Duration::ZERO, Duration::ZERO);
+        for (width, height) in [(72, 22), (42, 18), (32, 16)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| {
+                render_ui(frame, &pet, &InputMode::Feed, &pose, &RunMode::Client, "Meal eaten");
+            }).unwrap();
+            let screen = terminal.backend().buffer().content.chunks(width as usize)
+                .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+                .collect::<Vec<_>>().join("\n");
+            for text in ["Meal eaten", "meal", "snack", "cancel", "Desktop client"] {
+                assert!(screen.contains(text), "{width}x{height} omitted {text}");
+            }
+        }
     }
 }

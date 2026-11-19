@@ -1,7 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod codex_setup;
 mod commands;
+mod desktop_walk;
 mod sidecar;
 mod socket;
 
@@ -87,9 +89,13 @@ fn main() {
         .manage(shared_perms)
         .invoke_handler(tauri::generate_handler![
             commands::get_state,
+            desktop_walk::desktop_walk_status,
+            desktop_walk::start_desktop_walk,
+            desktop_walk::bring_pet_home,
             commands::feed_meal,
             commands::feed_snack,
             commands::play_game,
+            commands::guess_direction,
             commands::discipline,
             commands::give_medicine,
             commands::clean_poop,
@@ -98,8 +104,14 @@ fn main() {
             commands::get_permissions,
             commands::update_permissions,
             commands::get_mcp_config,
+            codex_setup::register_with_codex,
         ])
         .setup(move |app| {
+            #[cfg(target_os = "macos")]
+            let recall = MenuItemBuilder::with_id("recall", "Bring Pet Home").enabled(false).build(app)?;
+            #[cfg(target_os = "macos")]
+            app.manage(desktop_walk::mac::Walker::new(recall.clone()));
+
             // ── Create main window with transparent titlebar ────────────
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("tama96")
@@ -138,9 +150,13 @@ fn main() {
             let status_item = MenuItemBuilder::with_id("status", "Pet Status").build(app)?;
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
 
-            let tray_menu = MenuBuilder::new(app)
+            let tray_menu = MenuBuilder::new(app);
+            let tray_menu = tray_menu
                 .item(&show_item)
-                .item(&status_item)
+                .item(&status_item);
+            #[cfg(target_os = "macos")]
+            let tray_menu = tray_menu.item(&recall);
+            let tray_menu = tray_menu
                 .separator()
                 .item(&quit_item)
                 .build()?;
@@ -172,6 +188,8 @@ fn main() {
                             let _ = window.set_focus();
                         }
                     }
+                    #[cfg(target_os = "macos")]
+                    "recall" => desktop_walk::mac::recall(app_handle),
                     "status" => {
                         // Update the status menu item text with current pet info
                         if let Ok(state) = tray_pet.lock() {

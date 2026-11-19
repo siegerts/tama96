@@ -42,7 +42,7 @@ fn resolve_dev_mcp_server_path() -> Option<String> {
 }
 
 /// Resolve the MCP server path for either a packaged app or a local dev run.
-fn resolve_mcp_server_path<R: Runtime>(app: &AppHandle<R>) -> String {
+pub(crate) fn resolve_mcp_server_path<R: Runtime>(app: &AppHandle<R>) -> String {
     if let Ok(p) = std::env::var("TAMA96_MCP_SERVER_PATH") {
         return p;
     }

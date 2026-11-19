@@ -21,7 +21,7 @@ Implementation Plan — tama96
   webview — game logic must live in Rust.
   - Tauri v2 sidecar support (externalBin in tauri.conf.json) bundles and spawns external binaries. Supports stdin/stdout communication via the
   shell plugin.
-  - @modelcontextprotocol/sdk (TypeScript) supports stdio transport natively. Standard connection method for Claude Desktop, Cursor, Kiro, etc.
+  - @modelcontextprotocol/sdk (TypeScript) supports stdio transport natively. Standard connection method for Claude Desktop, Cursor, and other clients.
   - Ratatui is the standard Rust TUI library (19k+ stars). Its canvas widget supports braille character rendering (2x4 dots per cell), meaning a
   32x16 pixel Tamagotchi sprite fits in ~16x4 terminal cells.
   - Cargo workspaces allow a shared tama-core library crate consumed by both the Tauri binary and the TUI binary, keeping game logic in one place.

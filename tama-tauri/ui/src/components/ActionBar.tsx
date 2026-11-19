@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import type { PetState, Choice } from "../types";
+import type { PetState } from "../types";
 
 interface ActionBarProps {
   state: PetState;
   feedMeal: () => Promise<void>;
   feedSnack: () => Promise<void>;
-  playGame: (moves: Choice[]) => Promise<unknown>;
+  onOpenGame: () => void;
   discipline: () => Promise<void>;
   giveMedicine: () => Promise<void>;
   cleanPoop: () => Promise<void>;
@@ -52,15 +52,11 @@ const tooltipStyle: React.CSSProperties = {
   pointerEvents: "none",
 };
 
-function randomMoves(): Choice[] {
-  return Array.from({ length: 5 }, () => (Math.random() < 0.5 ? "Left" : "Right"));
-}
-
 export default function ActionBar({
   state,
   feedMeal,
   feedSnack,
-  playGame,
+  onOpenGame,
   discipline,
   giveMedicine,
   cleanPoop,
@@ -110,9 +106,9 @@ export default function ActionBar({
     try { await feedSnack(); } catch (e) { setError(String(e)); }
   };
 
-  const handleGame = async () => {
+  const handleGame = () => {
     if (dead || sleeping) return;
-    await playGame(randomMoves());
+    onOpenGame();
   };
 
   const hasDisciplineCall = state.pending_discipline_deadline !== null;

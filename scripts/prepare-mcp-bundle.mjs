@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,37 +12,28 @@ const sourceDir = path.join(root, "mcp-server", "dist");
 const sourcePackageJson = path.join(root, "mcp-server", "package.json");
 const targetDir = path.join(root, "tama-tauri", "src-tauri", "mcp-server-dist");
 
-function copyDirContents(source, target) {
-  const entries = fs.readdirSync(source, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const sourcePath = path.join(source, entry.name);
-    const targetPath = path.join(target, entry.name);
-
-    if (entry.isDirectory()) {
-      fs.mkdirSync(targetPath, { recursive: true });
-      copyDirContents(sourcePath, targetPath);
-      continue;
-    }
-
-    fs.copyFileSync(sourcePath, targetPath);
-  }
-}
-
-if (!fs.existsSync(sourceDir)) {
-  console.error("[prepare-mcp-bundle] missing mcp-server/dist. Run `npm --prefix mcp-server run build` first.");
-  process.exit(1);
-}
-
 if (!fs.existsSync(path.join(sourceDir, "index.js"))) {
   console.error("[prepare-mcp-bundle] missing mcp-server/dist/index.js after build.");
   process.exit(1);
 }
 
+// Resolve from the MCP package so release builds need only its locked dependencies.
+const { build } = createRequire(sourcePackageJson)("esbuild");
+const bundle = await build({
+  entryPoints: [path.join(sourceDir, "index.js")],
+  bundle: true,
+  platform: "node",
+  target: "node18",
+  format: "esm",
+  banner: { js: 'import { createRequire as createNodeRequire } from "node:module"; const require = createNodeRequire(import.meta.url);' },
+  legalComments: "eof",
+  write: false,
+});
+
 fs.rmSync(targetDir, { force: true, recursive: true });
 fs.mkdirSync(targetDir, { recursive: true });
 
-copyDirContents(sourceDir, targetDir);
+fs.writeFileSync(path.join(targetDir, "index.js"), bundle.outputFiles[0].contents);
 fs.copyFileSync(sourcePackageJson, path.join(targetDir, "package.json"));
 fs.writeFileSync(path.join(targetDir, ".gitkeep"), "\n");
 

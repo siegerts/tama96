@@ -1,0 +1,166 @@
+.guess-dialog {
+  width: min(268px, calc(100% - 12px));
+  max-width: calc(100% - 12px);
+  max-height: calc(100% - 12px);
+  overflow-y: auto;
+  margin: auto;
+  padding: 12px;
+  color: #2d3627;
+  background: #f1f2df;
+  border: 2px solid #46523b;
+  border-radius: 12px;
+  font:
+    12px/1.35 Menlo,
+    monospace;
+}
+.guess-dialog::backdrop {
+  background: #1a241eb5;
+}
+.guess-dialog header,
+.game-counter,
+.unlock-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.guess-dialog h2 {
+  font-size: 16px;
+}
+.guess-dialog button {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.guess-dialog button:focus-visible {
+  outline: 2px solid #677a4b;
+  outline-offset: 2px;
+}
+.guess-dialog .game-close {
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  padding: 0 4px;
+}
+.guess-lcd {
+  margin: 7px 0 10px;
+  padding: 9px;
+  background: #c4cfa1;
+  border: 2px solid #74805b;
+  box-shadow: inset 2px 2px #aeb98d;
+  border-radius: 5px;
+  text-align: center;
+}
+.game-counter {
+  font-size: 10px;
+  font-weight: 700;
+}
+.guess-lcd canvas {
+  display: block;
+  margin: auto;
+  width: 88px;
+  height: 88px;
+  image-rendering: pixelated;
+}
+.guess-lcd strong {
+  display: block;
+  min-height: 17px;
+  font-size: 12px;
+}
+.game-actions {
+  display: flex;
+  gap: 7px;
+}
+.game-actions button {
+  flex: 1;
+  background: #364733;
+  color: #fbfbea;
+  border: 1px solid #263129;
+  border-radius: 5px;
+  padding: 7px 0;
+  font-weight: bold;
+}
+.game-actions button:disabled {
+  opacity: 0.65;
+}
+.game-note {
+  margin: 7px 0;
+  text-align: center;
+  font-size: 10px;
+}
+.unlock-meter {
+  border-top: 1px solid #bfc6a8;
+  padding-top: 6px;
+  font-size: 10px;
+}
+.unlock-meter progress {
+  flex: 1;
+  width: 30px;
+  height: 5px;
+  accent-color: #485f44;
+}
+.form-link {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 1px solid #95a088;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.guess-dialog.emerged {
+  background: #16242b;
+  color: #dbe7c6;
+  border-color: #93b999;
+}
+.sculpture {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+  object-fit: contain;
+  margin-top: 4px;
+}
+
+.sculpture[role="slider"] {
+  cursor: grab;
+  touch-action: none;
+}
+.sculpture:focus-visible {
+  outline: 2px solid #c2deaa;
+}
+
+.guess-dialog:has(.walk-launch) .sculpture {
+  max-height: 48vh;
+}
+.guess-dialog .walk-launch {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #d2e5a3;
+  border-radius: 5px;
+  background: #c2db94;
+  color: #24342b;
+  font-weight: bold;
+}
+.walk-launch:disabled { opacity: 0.55; }
+.walk-home {
+  position: absolute;
+  inset: 65px 0 auto;
+  height: 92px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  color: #485439;
+  font: 11px/1.3 Menlo, monospace;
+}
+.walk-home button {
+  color: #2d3627;
+  background: #cfdaae;
+  border: 1px solid #75835b;
+  border-radius: 4px;
+  padding: 4px 9px;
+  font: inherit;
+  cursor: pointer;
+}

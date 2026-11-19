@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Choice, GameResult, PetState } from "../types";
+import type { Choice, PetState } from "../types";
 
 export interface UsePetStateReturn {
   state: PetState | null;
@@ -8,7 +8,7 @@ export interface UsePetStateReturn {
   error: string | null;
   feedMeal: () => Promise<void>;
   feedSnack: () => Promise<void>;
-  playGame: (moves: Choice[]) => Promise<GameResult>;
+  guessDirection: (choice: Choice, displayed: PetState) => Promise<PetState>;
   discipline: () => Promise<void>;
   giveMedicine: () => Promise<void>;
   cleanPoop: () => Promise<void>;
@@ -26,7 +26,7 @@ export function usePetState(): UsePetStateReturn {
     try {
       const s = await invoke<PetState>("get_state");
       if (mountedRef.current) {
-        setState(s);
+        setState(current => current && current.birth_time === s.birth_time && current.game.turn > s.game.turn ? current : s);
         setError(null);
       }
     } catch (e) {
@@ -56,29 +56,26 @@ export function usePetState(): UsePetStateReturn {
   }, [refresh]);
 
   const feedMeal = useCallback(async () => {
-    try {
-      const s = await invoke<PetState>("feed_meal");
-      console.log("feed_meal result:", s);
-      if (mountedRef.current) setState(s);
-    } catch (e) {
-      console.error("feed_meal error:", e);
-    }
+    const s = await invoke<PetState>("feed_meal");
+    if (mountedRef.current) setState(s);
   }, []);
 
   const feedSnack = useCallback(async () => {
-    try {
-      const s = await invoke<PetState>("feed_snack");
-      console.log("feed_snack result:", s);
-      if (mountedRef.current) setState(s);
-    } catch (e) {
-      console.error("feed_snack error:", e);
-    }
+    const s = await invoke<PetState>("feed_snack");
+    if (mountedRef.current) setState(s);
   }, []);
 
-  const playGame = useCallback(async (moves: Choice[]): Promise<GameResult> => {
-    const result = await invoke<GameResult>("play_game", { moves });
-    await refresh();
-    return result;
+  const guessDirection = useCallback(async (choice: Choice, displayed: PetState) => {
+    try {
+      const next = await invoke<PetState>("guess_direction", {
+        guess: { choice, turn: displayed.game.turn, birth_time: displayed.birth_time },
+      });
+      if (mountedRef.current) setState(next);
+      return next;
+    } catch (e) {
+      await refresh();
+      throw e;
+    }
   }, [refresh]);
 
   const discipline = useCallback(async () => {
@@ -112,7 +109,7 @@ export function usePetState(): UsePetStateReturn {
     error,
     feedMeal,
     feedSnack,
-    playGame,
+    guessDirection,
     discipline,
     giveMedicine,
     cleanPoop,

@@ -1,144 +1,31 @@
 import { useRef, useEffect, useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { WalkStatus } from "../desktopWalk";
 import type { PetState, Choice } from "../types";
+import { idleMotion, petFrame } from "../petSprites";
+import GuessGame from "./GuessGame";
+import CareControls, { type CareAction } from "./CareControls";
 
 export interface PetDisplayProps {
   state: PetState;
   feedMeal: () => Promise<void>;
   feedSnack: () => Promise<void>;
-  playGame: (moves: Choice[]) => Promise<unknown>;
+  guessDirection: (choice: Choice, displayed: PetState) => Promise<PetState>;
   discipline: () => Promise<void>;
   giveMedicine: () => Promise<void>;
   cleanPoop: () => Promise<void>;
   toggleLights: () => Promise<void>;
 }
 
-// ── Pixel grid sprites (16x16 grids, 1 = dark pixel, 0 = off) ──────────────
-type Sprite = number[];
-
-const SPRITES: Record<string, Sprite> = {
-  Egg: [
-    0b0000001111000000, 0b0000111111110000, 0b0001110110111000, 0b0011111011011100,
-    0b0011101101111100, 0b0011110110111100, 0b0011101101111100, 0b0011111011011100,
-    0b0011110110111100, 0b0011101101111100, 0b0011111011011100, 0b0001110110111000,
-    0b0000111111110000, 0b0000001111000000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Babytchi: [
-    0b0000000000000000, 0b0000000110000000, 0b0000011111100000, 0b0000111111110000,
-    0b0001111111111000, 0b0001101111011000, 0b0001111111111000, 0b0001111001111000,
-    0b0001111111111000, 0b0000111111110000, 0b0000011111100000, 0b0000001111000000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Marutchi: [
-    0b0000000000000000, 0b0000011111100000, 0b0000111111110000, 0b0001111111111000,
-    0b0011100110011100, 0b0011100110011100, 0b0011111111111100, 0b0011100000011100,
-    0b0011110000111100, 0b0001111111111000, 0b0000111111110000, 0b0000011111100000,
-    0b0000011001100000, 0b0000011001100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Tamatchi: [
-    0b0001100000011000, 0b0000110000110000, 0b0000111111110000, 0b0001111111111000,
-    0b0001101111011000, 0b0001101111011000, 0b0001111111111000, 0b0001110000111000,
-    0b0001111111111000, 0b0000111111110000, 0b0000011111100000, 0b0000001111000000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Kuchitamatchi: [
-    0b0000000000000000, 0b0000011111100000, 0b0000111111110000, 0b0001111111111000,
-    0b0001101111011000, 0b0001111111111000, 0b0001111111111000, 0b0001111111111110,
-    0b0001111111111110, 0b0001111111111000, 0b0000111111110000, 0b0000011111100000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Mametchi: [
-    0b0000000000000000, 0b0011111111111100, 0b0011111111111100, 0b0001111111111000,
-    0b0001111111111000, 0b0001101111011000, 0b0001101111011000, 0b0001111111111000,
-    0b0001110000111000, 0b0001111111111000, 0b0000111111110000, 0b0000011111100000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Ginjirotchi: [
-    0b0000000000000000, 0b0000010000100000, 0b0000111111110000, 0b0001111111111000,
-    0b0011111111111100, 0b0011011111101100, 0b0011011111101100, 0b0011111111111100,
-    0b0011111001111100, 0b0011111111111100, 0b0001111111111000, 0b0000111111110000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Maskutchi: [
-    0b0000000000000000, 0b0000111111110000, 0b0001111111111000, 0b0011111111111100,
-    0b0011100011100100, 0b0011100011100100, 0b0011111111111100, 0b0011111111111100,
-    0b0011110000111100, 0b0011111111111100, 0b0001111111111000, 0b0000111111110000,
-    0b0000010000100000, 0b0000110000110000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Kuchipatchi: [
-    0b0000000000000000, 0b0000011111100000, 0b0000111111110000, 0b0001111111111000,
-    0b0011111111111100, 0b0011011111101100, 0b0011111111111100, 0b0011111111111100,
-    0b0011111111111110, 0b0011111111111110, 0b0001111111111000, 0b0000111111110000,
-    0b0000010000100000, 0b0000111001110000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Nyorotchi: [
-    0b0000000000000000, 0b0000000000000000, 0b0000111110000000, 0b0001111111000000,
-    0b0001101101000000, 0b0001111111000000, 0b0001110011000000, 0b0000111110000000,
-    0b0000011100000000, 0b0000001110000000, 0b0000011111000000, 0b0000111111100000,
-    0b0001111111110000, 0b0000111111100000, 0b0000011111000000, 0b0000000000000000,
-  ],
-  Tarakotchi: [
-    0b0000100000010000, 0b0000010000100000, 0b0000111111110000, 0b0001111111111000,
-    0b0011111111111100, 0b0011011111101100, 0b0011111111111100, 0b0011110000111100,
-    0b0011111111111100, 0b0001111111111000, 0b0000111111110000, 0b0000010000100000,
-    0b0000111001110000, 0b0000000000000000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  Oyajitchi: [
-    0b0000001111000000, 0b0000011111100000, 0b0000111111110000, 0b0001111111111000,
-    0b0001101111011000, 0b0001101111011000, 0b0001111111111000, 0b0001100110011000,
-    0b0001111001111000, 0b0001111111111000, 0b0000111111110000, 0b0000011111100000,
-    0b0000010000100000, 0b0000010000100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  sleeping: [
-    0b0000000000000000, 0b0000011111100000, 0b0000111111110000, 0b0001111111111000,
-    0b0001110110111000, 0b0001111111111000, 0b0001111111111000, 0b0001111111111000,
-    0b0000111111110000, 0b0000011111100000, 0b0000000000000000, 0b0000000000111000,
-    0b0000000001000000, 0b0000000000011000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  sick: [
-    0b0000000000010000, 0b0000011111101000, 0b0000111111110000, 0b0001111111111000,
-    0b0001010110101000, 0b0001111111111000, 0b0001111001111000, 0b0001111111111000,
-    0b0000111111110000, 0b0000011111100000, 0b0000001111000000, 0b0000010000100000,
-    0b0000010000100000, 0b0000000000000000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  dead: [
-    0b0000001111000000, 0b0000010000100000, 0b0000001111000000, 0b0000011111100000,
-    0b0000111111110000, 0b0001111111111000, 0b0001010110101000, 0b0001111111111000,
-    0b0001111001111000, 0b0001111111111000, 0b0000111111110000, 0b0000011111100000,
-    0b0000010101010000, 0b0000001010100000, 0b0000000000000000, 0b0000000000000000,
-  ],
-  poop: [
-    0b00000100, 0b00001000, 0b00010110, 0b00101001,
-    0b01001001, 0b01001001, 0b00111110, 0b00000000,
-  ],
-};
-
-// ── Icon strip sprites (8x8) ───────────────────────────────────────────────
-const ICON_FEED: number[] = [0b00100100, 0b00100100, 0b01111110, 0b01000010, 0b01000010, 0b00111100, 0b00011000, 0b00000000];
-const ICON_LIGHT: number[] = [0b00011000, 0b00100100, 0b01000010, 0b01011010, 0b01000010, 0b00100100, 0b00011000, 0b00000000];
-const ICON_GAME: number[] = [0b00111100, 0b01000010, 0b10011001, 0b10000001, 0b10011001, 0b01000010, 0b00111100, 0b00000000];
-const ICON_MED: number[] = [0b00011000, 0b00111100, 0b01111110, 0b00011000, 0b00011000, 0b00011000, 0b00011000, 0b00000000];
-const ICON_BATH: number[] = [0b01000010, 0b00100100, 0b00011000, 0b01111110, 0b01111110, 0b01111110, 0b00111100, 0b00000000];
-const ICON_METER: number[] = [0b01111110, 0b01000010, 0b01011010, 0b01010010, 0b01010010, 0b01000010, 0b01111110, 0b00000000];
-const ICON_DISC: number[] = [0b00011000, 0b00111100, 0b01111110, 0b00011000, 0b00011000, 0b01100110, 0b01100110, 0b00000000];
-const ICON_ATTN: number[] = [0b00011000, 0b00011000, 0b00011000, 0b00011000, 0b00011000, 0b00000000, 0b00011000, 0b00000000];
-
-const TOP_ICONS = [ICON_FEED, ICON_LIGHT, ICON_GAME, ICON_MED];
-const BOTTOM_ICONS = [ICON_BATH, ICON_METER, ICON_DISC, ICON_ATTN];
-
-const TOP_LABELS = ["Feed", "Light", "Game", "Medicine"];
-const BOTTOM_LABELS = ["Clean", "Stats", "Discipline", "Attention"];
+const POOP = [
+  0b00000100, 0b00001000, 0b00010110, 0b00101001,
+  0b01001001, 0b01001001, 0b00111110, 0b00000000,
+];
 
 const PX = 6;
 
 // ── Rendering helpers ───────────────────────────────────────────────────────
-
-function getSpriteKey(state: PetState): string {
-  if (!state.is_alive) return "dead";
-  if (state.stage === "Egg") return "Egg";
-  if (state.is_sleeping) return "sleeping";
-  if (state.is_sick) return "sick";
-  return state.character;
-}
 
 function drawSprite(
   ctx: CanvasRenderingContext2D, sprite: number[],
@@ -152,34 +39,6 @@ function drawSprite(
       }
     }
   }
-}
-
-/** Render an 8x8 icon row with highlight support. */
-function drawIconRow(
-  ctx: CanvasRenderingContext2D, icons: number[][], y: number,
-  totalWidth: number, px: number, color: string, ghostColor: string,
-  highlightIndex?: number,
-) {
-  const iconW = 8 * px;
-  const spacing = (totalWidth - icons.length * iconW) / (icons.length + 1);
-  icons.forEach((icon, i) => {
-    const ix = spacing + i * (iconW + spacing);
-    // Ghost background
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        ctx.fillStyle = ghostColor;
-        ctx.fillRect(ix + col * px, y + row * px, px, px);
-      }
-    }
-    // Active pixels — highlighted icon gets inverted look
-    const iconColor = i === highlightIndex ? "#556b2f" : color;
-    drawSprite(ctx, icon, ix, y, 8, px, iconColor);
-    // Highlight underline
-    if (i === highlightIndex) {
-      ctx.fillStyle = color;
-      ctx.fillRect(ix, y + 8 * px - px, iconW, px);
-    }
-  });
 }
 
 const HEART_FULL: number[] = [0b0110, 0b1111, 0b1111, 0b0110];
@@ -197,33 +56,39 @@ function drawHearts(
   }
 }
 
-/** Get the icon hit-test regions for a row of 4 icons. */
-function getIconRegions(totalWidth: number, y: number, px: number) {
-  const iconW = 8 * px;
-  const spacing = (totalWidth - 4 * iconW) / 5;
-  return Array.from({ length: 4 }, (_, i) => ({
-    x: spacing + i * (iconW + spacing),
-    y,
-    w: iconW,
-    h: 8 * px,
-  }));
-}
-
-function randomMoves(): Choice[] {
-  return Array.from({ length: 5 }, () => (Math.random() < 0.5 ? "Left" : "Right"));
-}
-
 // ── Main component ──────────────────────────────────────────────────────────
 
 export default function PetDisplay({
-  state, feedMeal, feedSnack, playGame,
+  state, feedMeal, feedSnack, guessDirection,
   discipline, giveMedicine, cleanPoop, toggleLights,
 }: PetDisplayProps) {
+  const [gameOpen, setGameOpen] = useState(false);
+  const [walk, setWalk] = useState<WalkStatus>({ supported: false, away: false });
+  useEffect(() => {
+    let mounted = true;
+    let received = false;
+    let unlisten: (() => void) | undefined;
+    async function connect() {
+      const off = await listen<boolean>("desktop-walk-changed", ({ payload }) => {
+        if (!mounted) return;
+        received = true;
+        setWalk({ supported: true, away: payload });
+      });
+      if (!mounted) { off(); return; }
+      unlisten = off;
+      const status = await invoke<WalkStatus>("desktop_walk_status");
+      if (mounted && !received && status) setWalk(status);
+    }
+    void connect().catch(() => {});
+    return () => { mounted = false; unlisten?.(); };
+  }, []);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hoverIcon, setHoverIcon] = useState<{ row: "top" | "bottom"; index: number } | null>(null);
   const [feedSubmenu, setFeedSubmenu] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [animFrame, setAnimFrame] = useState(0);
+  const [feeding, setFeeding] = useState(false);
+  const previousWeight = useRef(state.weight);
+  const motion = idleMotion(state);
   const lastLightsDeadlineRef = useRef<string | null>(null);
 
   const px = PX;
@@ -233,19 +98,29 @@ export default function PetDisplay({
   const heartRowH = 4 * px;
   const gap = 2 * px;
   const canvasH = iconRowH + gap + spriteH + gap + heartRowH + gap + heartRowH + gap + iconRowH;
-  const bottomIconY = canvasH - iconRowH;
 
-  // Idle animation timer — shift sprite position every ~1.2s
   useEffect(() => {
-    if (!state.is_alive || state.is_sleeping) {
+    if (motion === "still") {
       setAnimFrame(0);
       return;
     }
-    const interval = setInterval(() => {
-      setAnimFrame(prev => (prev + 1) % 4);
-    }, 1200);
-    return () => clearInterval(interval);
-  }, [state.is_alive, state.is_sleeping]);
+    const delay = motion === "gesture" && animFrame % 2 === 1 ? 300 : 1200;
+    const timer = window.setTimeout(() => setAnimFrame((animFrame + 1) % 4), delay);
+    return () => window.clearTimeout(timer);
+  }, [motion, animFrame]);
+
+  // Meals and snacks both add weight, even at full hearts. Observing the
+  // snapshot also catches food given through the terminal or an agent.
+  useEffect(() => {
+    const ate = state.weight > previousWeight.current;
+    previousWeight.current = state.weight;
+    const showBite = ate && state.character === "Kuchipatchi" && !state.is_sleeping && !state.is_sick;
+    setFeeding(showBite);
+    if (showBite) {
+      const timer = window.setTimeout(() => setFeeding(false), 450);
+      return () => window.clearTimeout(timer);
+    }
+  }, [state.weight, state.character, state.is_sleeping, state.is_sick]);
 
   // Show a brief toast message
   const showToast = useCallback((msg: string) => {
@@ -265,97 +140,50 @@ export default function PetDisplay({
 
   const sleepStatus = getSleepStatus(state);
 
-  // Handle icon clicks
-  const handleCanvasClick = useCallback(async (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    // Use CSS dimensions for hit-test (not buffer size which includes DPR)
-    const cx = (e.clientX - rect.left) * (canvasW / rect.width);
-    const cy = (e.clientY - rect.top) * (canvasH / rect.height);
-
-    // Top icon row
-    const topRegions = getIconRegions(canvasW, 0, px);
-    for (let i = 0; i < topRegions.length; i++) {
-      const r = topRegions[i];
-      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
-        try {
-          if (i === 0) { // Feed
-            setFeedSubmenu(prev => !prev);
-          } else if (i === 1) { // Light
-            await toggleLights();
-          } else if (i === 2) { // Game
-            await playGame(randomMoves());
-            showToast("Game played!");
-          } else if (i === 3) { // Medicine
-            await giveMedicine();
-            showToast("Medicine given");
-          }
-        } catch (err) { showToast(String(err)); }
-        return;
-      }
+  async function handleAction(action: CareAction) {
+    if (action === "Feed") {
+      setFeedSubmenu(open => !open);
+      return;
     }
-
-    // Bottom icon row
-    const bottomRegions = getIconRegions(canvasW, bottomIconY, px);
-    for (let i = 0; i < bottomRegions.length; i++) {
-      const r = bottomRegions[i];
-      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
-        try {
-          if (i === 0) { // Bath/Clean
-            await cleanPoop();
-            showToast("Cleaned!");
-          } else if (i === 1) { // Meter — no action, just info
-            showToast(`❤${state.hunger}/4  😊${state.happiness}/4  WT:${state.weight}`);
-          } else if (i === 2) { // Discipline
-            await discipline();
-            showToast("Disciplined!");
-          } else if (i === 3) { // Attention — no action, just info
-            const msgs: string[] = [];
-            if (state.pending_lights_deadline) msgs.push("BEDTIME");
-            if (state.is_sick) msgs.push("SICK");
-            if (state.poop_count > 0) msgs.push("POOP");
-            if (state.pending_discipline_deadline) msgs.push("DISCIPLINE");
-            showToast(msgs.length ? msgs.join(" ") : sleepStatus.summary);
-          }
-        } catch (err) { showToast(String(err)); }
-        return;
-      }
-    }
-
-    // Click elsewhere closes feed submenu
     setFeedSubmenu(false);
-  }, [canvasW, canvasH, bottomIconY, px, state, toggleLights, playGame, giveMedicine, cleanPoop, discipline, showToast, sleepStatus.summary]);
-
-  // Handle hover for cursor + tooltip
-  const handleCanvasMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (canvasW / rect.width);
-    const cy = (e.clientY - rect.top) * (canvasH / rect.height);
-
-    const topRegions = getIconRegions(canvasW, 0, px);
-    for (let i = 0; i < topRegions.length; i++) {
-      const r = topRegions[i];
-      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
-        setHoverIcon({ row: "top", index: i });
-        canvas.style.cursor = "pointer";
-        return;
+    try {
+      switch (action) {
+        case "Light":
+          await toggleLights();
+          break;
+        case "Game":
+          if (walk.away) showToast("Bring your pet home to play");
+          else setGameOpen(true);
+          break;
+        case "Medicine":
+          await giveMedicine();
+          showToast("Medicine given");
+          break;
+        case "Clean":
+          await cleanPoop();
+          showToast("Cleaned!");
+          break;
+        case "Stats":
+          showToast(`❤${state.hunger}/4  😊${state.happiness}/4  WT:${state.weight}`);
+          break;
+        case "Discipline":
+          await discipline();
+          showToast("Disciplined!");
+          break;
+        case "Attention": {
+          const messages = [];
+          if (state.pending_lights_deadline) messages.push("BEDTIME");
+          if (state.is_sick) messages.push("SICK");
+          if (state.poop_count > 0) messages.push("POOP");
+          if (state.pending_discipline_deadline) messages.push("DISCIPLINE");
+          showToast(messages.join(" ") || sleepStatus.summary);
+          break;
+        }
       }
+    } catch (e) {
+      showToast(String(e));
     }
-    const bottomRegions = getIconRegions(canvasW, bottomIconY, px);
-    for (let i = 0; i < bottomRegions.length; i++) {
-      const r = bottomRegions[i];
-      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) {
-        setHoverIcon({ row: "bottom", index: i });
-        canvas.style.cursor = "pointer";
-        return;
-      }
-    }
-    setHoverIcon(null);
-    canvas.style.cursor = "default";
-  }, [canvasW, canvasH, bottomIconY, px]);
+  }
 
   // Draw canvas
   useEffect(() => {
@@ -379,30 +207,17 @@ export default function PetDisplay({
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    let y = 0;
-
-    // Top icon row (with highlight)
-    const topHi = hoverIcon?.row === "top" ? hoverIcon.index : undefined;
-    drawIconRow(ctx, TOP_ICONS, y, canvasW, px, pixel, ghost, topHi);
-    y += iconRowH + gap;
-
-    // Pet sprite with idle movement
-    const spriteKey = getSpriteKey(state);
-    const sprite = SPRITES[spriteKey] ?? SPRITES["Egg"];
+    let y = iconRowH + gap;
     const baseSpriteX = (canvasW - 16 * px) / 2;
-    // Idle horizontal offset: 0, +2px, 0, -2px
-    const idleOffsets = [0, 2 * px, 0, -2 * px];
-    const offsetX = (state.is_alive && !state.is_sleeping) ? idleOffsets[animFrame] : 0;
-    const spriteX = baseSpriteX + offsetX;
-    drawSprite(ctx, sprite, spriteX, y, 16, px, pixel);
+    const offsetX = motion === "drift" ? [0, 2, 0, -2][animFrame] * px : 0;
+    if (!walk.away) drawSprite(ctx, petFrame(state, animFrame, feeding), baseSpriteX + offsetX, y, 16, px, pixel);
 
     // Poop
     if (state.poop_count > 0 && state.is_alive) {
-      const poopSprite = SPRITES["poop"];
       for (let i = 0; i < Math.min(state.poop_count, 2); i++) {
         const poopX = baseSpriteX + 16 * px + px;
         const poopY = y + spriteH - (i + 1) * 8 * px;
-        if (poopSprite) drawSprite(ctx, poopSprite, poopX, poopY, 8, px, pixel);
+        drawSprite(ctx, POOP, poopX, poopY, 8, px, pixel);
       }
     }
     y += spriteH + gap;
@@ -414,52 +229,34 @@ export default function PetDisplay({
 
     // Happiness hearts
     drawHearts(ctx, state.happiness, 4, heartsX, y, px, pixel, ghost);
-    y += heartRowH + gap;
-
-    // Bottom icon row (with highlight)
-    const botHi = hoverIcon?.row === "bottom" ? hoverIcon.index : undefined;
-    drawIconRow(ctx, BOTTOM_ICONS, y, canvasW, px, pixel, ghost, botHi);
-  }, [state, canvasW, canvasH, px, hoverIcon, iconRowH, gap, spriteH, heartRowH, bottomIconY, animFrame]);
-
-  // Tooltip text
-  const tooltipText = hoverIcon
-    ? (
-      hoverIcon.row === "top"
-        ? (hoverIcon.index === 1 ? sleepStatus.summary : TOP_LABELS[hoverIcon.index])
-        : (hoverIcon.index === 3 && state.pending_lights_deadline
-          ? "Bedtime alert"
-          : BOTTOM_LABELS[hoverIcon.index])
-    )
-    : null;
+  }, [state, canvasW, canvasH, px, iconRowH, gap, spriteH, heartRowH, animFrame, motion, feeding, walk.away]);
 
   return (
     <div style={containerStyle}>
-      <div style={lcdFrameStyle}>
+      <div className="pet-lcd" style={lcdFrameStyle}>
         <canvas
           ref={canvasRef}
           style={lcdStyle}
-          onClick={handleCanvasClick}
-          onMouseMove={handleCanvasMove}
-          onMouseLeave={() => { setHoverIcon(null); }}
+          onClick={() => setFeedSubmenu(false)}
+          aria-label={`${state.character}, hunger ${state.hunger} of 4, happiness ${state.happiness} of 4`}
         />
-        {/* Toast takes priority over tooltip */}
-        {toast && (
-          <div style={{
-            ...toastStyle,
-            ...(hoverIcon?.row === "bottom" || !hoverIcon
-              ? { top: 4, bottom: "auto" }
-              : { bottom: 4, top: "auto" }),
-          }}>{toast}</div>
+        <div className="heart-readout" tabIndex={0} role="group" aria-label={`Hunger ${state.hunger} of 4, Happiness ${state.happiness} of 4`}>
+          <span>Hunger</span><span>Happiness</span>
+        </div>
+        {walk.away && (
+          <div className="walk-home">
+            <span>Out on the desktop</span>
+            <button onClick={() => invoke("bring_pet_home").catch(e => showToast(String(e)))}>Bring home</button>
+          </div>
         )}
-        {/* Tooltip */}
-        {tooltipText && !toast && (
-          <div style={{
-            ...tooltipStyle,
-            ...(hoverIcon?.row === "top"
-              ? { top: "auto", bottom: 4 }
-              : { bottom: "auto", top: 4 }),
-          }}>{tooltipText}</div>
-        )}
+        <CareControls
+          onAction={handleAction}
+          feedOpen={feedSubmenu}
+          lightsOn={state.lights_on}
+          lightHint={sleepStatus.summary}
+          attentionHint={state.pending_lights_deadline ? "Bedtime alert" : "Attention"}
+        />
+        {toast && <div role="status" style={toastStyle}>{toast}</div>}
         {/* Feed submenu */}
         {feedSubmenu && (
           <div style={feedMenuStyle}>
@@ -475,6 +272,7 @@ export default function PetDisplay({
         )}
       </div>
       <InfoPanel state={state} />
+      {gameOpen && <GuessGame state={state} guessDirection={guessDirection} canRoam={walk.supported} onDepart={() => setGameOpen(false)} onClose={() => setGameOpen(false)} />}
     </div>
   );
 }
@@ -698,20 +496,14 @@ const lcdStyle: React.CSSProperties = {
   display: "block",
 };
 
-const tooltipStyle: React.CSSProperties = {
-  position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)",
-  background: "#333", color: "#fff", padding: "3px 8px", borderRadius: 3,
-  fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap", pointerEvents: "none", zIndex: 20,
-};
-
 const toastStyle: React.CSSProperties = {
-  position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)",
+  position: "absolute", bottom: 55, left: "50%", transform: "translateX(-50%)",
   background: "#222", color: "#8a8", padding: "3px 8px", borderRadius: 3,
   fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap", pointerEvents: "none",
 };
 
 const feedMenuStyle: React.CSSProperties = {
-  position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
+  position: "absolute", top: 51, left: "50%", transform: "translateX(-50%)",
   display: "flex", gap: 4, background: "#222e", border: "1px solid #555",
   borderRadius: 4, padding: 4, zIndex: 15,
 };
