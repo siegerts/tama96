@@ -4,6 +4,7 @@ import Base from '../layouts/Base.astro';
 
 <Base title="tama96 - Docs">
   <h1>Docs</h1>
+  <p class="setup-links"><a href="#codex">Set up Codex</a></p>
 
   <section>
     <h2>How it works</h2>
@@ -67,10 +68,20 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
   </section>
 
   <section>
-    <h2 id="mcp">MCP / AI agent</h2>
-    <p>Open <strong>Connect Codex → Add to Codex</strong> in tama96. Setup uses your local Codex CLI and Node.js 18 or newer. Keep tama96 open, start a new Codex chat, and ask “How is my tama96 pet doing?”</p>
-    <p>For manual Codex setup, choose <strong>Manual setup → Copy TOML</strong>. For JSON-based clients, choose <strong>Other clients → Copy JSON</strong> and merge the server entry into your MCP configuration.</p>
-    <p>Agent permissions are configurable per-action with rate limits. The master switch disables all agent access.</p>
+    <h2 id="mcp">Use tama96 with an AI assistant</h2>
+    <p>Install and open the <a href="/download">tama96 desktop app</a> on the computer where you’ll use your MCP client.</p>
+
+    <h3 id="codex">Connect Codex</h3>
+    <ol>
+      <li>Install <a href="https://nodejs.org/">Node.js</a> 18 or newer.</li>
+      <li>In tama96, click <strong>Connect Codex → Add to Codex</strong>. When the button says <strong>Configured</strong>, the local Codex CLI has saved the bundled MCP server.</li>
+      <li>Keep tama96 running and start a new local Codex chat. Ask “Use the tama96 tool to tell me my pet’s hunger and happiness.”</li>
+    </ol>
+    <p>If automatic setup can’t find the CLI, choose <strong>Connect Codex → Manual setup → Copy TOML</strong>. Add the <code>[mcp_servers.tama96]</code> block to <code>~/.codex/config.toml</code> or update the existing block. If you use a custom <code>CODEX_HOME</code>, edit <code>config.toml</code> there. If Codex can’t find <code>node</code>, use its absolute executable path as the <code>command</code>. Restart Codex if the tool is missing in a new chat. <a href="https://learn.chatgpt.com/docs/extend/mcp#connect-codex-to-an-mcp-server">Codex MCP configuration</a></p>
+    <p>If a tool call is denied, open <strong>Settings</strong> in tama96 and check agent access, the action’s permission, and its rate limit.</p>
+
+    <h3>Other MCP clients</h3>
+    <p>For a client that supports local stdio servers, choose <strong>Connect Codex → Other clients → Copy JSON</strong> and merge the <code>tama96</code> entry into your MCP configuration. Keep the tama96 desktop app running.</p>
   </section>
 
   <section>
@@ -104,9 +115,12 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
     h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 36px; }
     section { margin-bottom: 36px; }
     h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 10px; }
-    h2[id] { scroll-margin-top: 72px; }
+    h2[id], h3[id] { scroll-margin-top: 72px; }
     h3 { font-size: 14px; font-weight: 500; color: #8a9470; margin: 14px 0 8px; }
-    p { color: var(--text-secondary); margin-bottom: 10px; font-size: 14px; line-height: 1.7; }
+    p, ol { color: var(--text-secondary); margin-bottom: 10px; font-size: 14px; line-height: 1.7; }
+    ol { padding-left: 24px; }
+    li + li { margin-top: 6px; }
+    .setup-links { margin: -24px 0 32px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 14px; }
     thead th {
       text-align: left; padding: 8px 12px; font-weight: 500;

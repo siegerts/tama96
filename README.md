@@ -4,6 +4,8 @@ A virtual pet inspired by the 1996 Tamagotchi P1. Play on desktop (Tauri + React
 
 **[Download the latest release](https://github.com/siegerts/tama96/releases)**
 
+[Set up Codex](#connect-codex)
+
 <img width="280" alt="Kuchipatchi on the desktop LCD" src="website/public/tama96-desktop.png" />
 
 
@@ -170,9 +172,17 @@ When bedtime starts, the TUI status area shows `BEDTIME` so you know to press `l
 
 ### MCP server
 
-Open **Connect Codex → Add to Codex** in the desktop app. This registers the bundled server with the local Codex CLI and verifies its saved entry. Setup requires Node.js 18 or newer. Keep the app running, open a new Codex chat, and ask “How is my tama96 pet doing?”
+#### Connect Codex
 
-If the Codex CLI is unavailable, **Manual setup → Copy TOML** gives you a section to add to your Codex `config.toml`. **Other clients → Copy JSON** gives you the corresponding server entry for JSON-based clients. The app also saves this JSON in `~/.tama96/mcp_config.json`. Merge the entry into your existing configuration. For Claude Desktop on macOS, use `~/Library/Application Support/Claude/claude_desktop_config.json`.
+1. Install Node.js 18 or newer and open the tama96 desktop app on the computer where Codex runs.
+2. In tama96, click **Connect Codex → Add to Codex**. When the button says **Configured**, the bundled MCP server is registered with your local Codex CLI.
+3. Keep tama96 running. Start a new local Codex chat and ask “Use the tama96 tool to tell me my pet’s hunger and happiness.”
+
+If automatic setup can’t find the CLI, choose **Connect Codex → Manual setup → Copy TOML**. Add the `[mcp_servers.tama96]` block to `~/.codex/config.toml` (or `config.toml` in your configured `CODEX_HOME`). Update the existing block if one is already there. If Codex can’t find `node`, use the absolute path to your Node.js executable as the `command`. Restart Codex if the tool is missing in a new chat, and check `codex mcp list` if you have the CLI. If a tool call is denied, check **Settings** in tama96 for agent access and per-action limits. [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp#connect-codex-to-an-mcp-server)
+
+#### Other MCP clients
+
+For a client that supports local stdio servers, choose **Connect Codex → Other clients → Copy JSON** and merge the `tama96` entry into your existing configuration. The app also saves this JSON in `~/.tama96/mcp_config.json`. For Claude Desktop on macOS, use `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
 The config looks like this (paths are filled in automatically):
 
