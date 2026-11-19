@@ -1,216 +1,126 @@
 ---
 import Base from '../layouts/Base.astro';
-import FeedingDemo from "../components/FeedingDemo.astro";
+import FeedingDemo from '../components/FeedingDemo.astro';
 ---
 
 <Base title="tama96 — virtual pet for your desktop">
   <section class="hero">
-    <div class="hero-split">
-      <div class="hero-text">
-        <h1>tama96</h1>
-        <p>A virtual pet for your desktop, terminal, or AI agent. Inspired by the 1996 original. Your care choices shape who your pet becomes.</p>
-        <div class="cta">
-          <a href="/download" class="btn-primary">Download</a>
-          <a href="/docs" class="btn-secondary">Documentation</a>
-        </div>
-      </div>
-      <div class="hero-img">
-        <FeedingDemo />
+    <div class="hero-copy">
+      <h1>tama96</h1>
+      <p>A little LCD pet for your desktop or terminal, inspired by the 1996 original. Earn three stars in its guessing game to unlock its 3D form.</p>
+      <div class="cta">
+        <a href="/download" class="btn-primary">Download</a>
+        <a href="/docs" class="btn-secondary">Documentation</a>
       </div>
     </div>
+    <figure class="film">
+      <video
+        id="pet-film" width="960" height="640" controls muted playsinline preload="metadata"
+        poster="/tama96-transformation-poster.webp" aria-labelledby="film-caption"
+      >
+        <source src="/tama96-transformation.mp4" type="video/mp4" />
+        <a href="/tama96-transformation.mp4">Watch Kuchipatchi turn 3D</a>
+      </video>
+      <figcaption id="film-caption">Kuchipatchi grows out of the LCD and takes a walk on macOS.</figcaption>
+    </figure>
   </section>
 
-  <section class="grid">
-    <article>
-      <h3>Desktop app</h3>
-      <p>Pixel LCD display with clickable icons. System tray, background ticks, desktop notifications. Always-on-top so your pet stays visible.</p>
-    </article>
-    <article>
-      <h3>Terminal</h3>
-      <p>Animated pixel pets with keyboard care controls. Runs standalone or connects to the desktop app as a client. Single binary, zero dependencies.</p>
-    </article>
-    <article>
-      <h3>AI agent</h3>
-      <p>Bundled MCP server lets AI tools feed, play with, and care for your pet. Per-action permissions and rate limits keep things under control.</p>
-    </article>
+  <section class="screens" aria-label="Desktop and terminal screenshots">
+    <figure>
+      <a class="shot handheld" href="/tama96-desktop.png" aria-label="Open full-size desktop app screenshot">
+        <img src="/tama96-desktop.png" width="560" height="770" loading="lazy" alt="Kuchipatchi in the handheld, with care icons and labeled hunger and happiness hearts." />
+      </a>
+      <figcaption><h2>Desktop app</h2><p>Feed your pet, turn out the lights, and check its hearts from the handheld.</p></figcaption>
+    </figure>
+    <figure>
+      <a class="shot terminal" href="/tama96-tui.png" aria-label="Open full-size terminal screenshot">
+        <img src="/tama96-tui.png" width="794" height="560" loading="lazy" alt="Mametchi in the terminal with its care meters and keyboard shortcuts." />
+      </a>
+      <figcaption><h2>Terminal</h2><p>Care for the same pet from your keyboard, or run the terminal on its own.</p></figcaption>
+    </figure>
   </section>
 
-  <section class="showcase">
-    <div class="showcase-secondary">
-      <div class="showcase-img terminal-preview">
-        <img src="/tama96-tui.png" alt="tama96 terminal TUI" />
-        <span class="img-label">Terminal</span>
-      </div>
-      <div class="showcase-img">
-        <img src="/tama96-mcp-tools.png" alt="tama96 MCP tools" />
-        <span class="img-label">MCP agent</span>
-      </div>
+  <section class="codex" aria-labelledby="codex-heading">
+    <div>
+      <h2 id="codex-heading">Care for your pet in Codex</h2>
+      <p>Ask Codex how your pet is doing. It can read the hearts from your running game, offer a snack, or play a round. You choose which actions it can take.</p>
+      <a class="text-link" href="/docs#mcp">Set up Codex <span aria-hidden="true">→</span></a>
     </div>
+    <figure>
+      <a class="codex-shot" href="/tama96-codex.png" aria-label="Open the full-size Codex conversation">
+        <img src="/tama96-codex.png" width="1056" height="438" loading="lazy" alt="Asked how the pet is doing, Codex calls tama96.get_status and reports four hunger hearts and three happiness hearts for Kuchipatchi." />
+      </a>
+      <figcaption>A live pet check through MCP, excerpted from Codex CLI.</figcaption>
+    </figure>
   </section>
 
-  <section class="evo">
-    <h2>Evolution</h2>
-    <p>Real-time lifecycle. One day equals one pet year. Hunger and happiness decay, poop accumulates, sickness sets in. How you respond determines which of 11 characters your pet becomes.</p>
-    <div class="chain">Egg → Baby → Child → Teen → Adult</div>
-    <p class="small">Best care leads to Mametchi. Neglect leads to Tarakotchi. <a href="/docs">Full evolution chart in the docs.</a></p>
+  <section class="evolution" aria-labelledby="evo-heading">
+    <div>
+      <h2 id="evo-heading">Evolution</h2>
+      <p>One day is one pet year. How you feed, play, and care for your pet shapes which of 11 characters it grows into.</p>
+      <p class="chain">Egg → Baby → Child → Teen → Adult</p>
+      <a class="text-link" href="/docs#evolution">Explore the evolution chart <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="interactive"><FeedingDemo /></div>
   </section>
-
-  <style>
-    .hero {
-      padding: 48px 0 56px;
-    }
-    .hero-split {
-      display: flex;
-      align-items: center;
-      gap: 40px;
-    }
-    .hero-text { flex: 1; }
-    .hero-text h1 {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 42px;
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      margin-bottom: 16px;
-    }
-    .hero-text p {
-      font-size: 17px;
-      color: var(--text-secondary);
-      line-height: 1.75;
-      max-width: 520px;
-      margin-bottom: 32px;
-    }
-    .hero-img {
-      flex-shrink: 0;
-      width: 284px;
-    }
-    .hero-img img { width: 100%; display: block; }
-    .cta { display: flex; gap: 12px; }
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      padding: 10px 24px;
-      background: var(--text);
-      color: var(--bg);
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      transition: opacity 0.15s;
-    }
-    .btn-primary:hover { opacity: 0.8; text-decoration: none; }
-    .btn-secondary {
-      display: inline-flex;
-      align-items: center;
-      padding: 10px 24px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      transition: all 0.15s;
-    }
-    .btn-secondary:hover { border-color: #999; color: var(--text); text-decoration: none; }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 64px;
-    }
-    .grid article {
-      background: var(--bg);
-      padding: 28px;
-    }
-    .grid h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      letter-spacing: -0.01em;
-    }
-    .grid p {
-      font-size: 13px;
-      color: var(--text-secondary);
-      line-height: 1.65;
-    }
-    .screenshot {
-      width: 100%;
-      margin-top: 16px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-    }
-
-    .showcase { margin-bottom: 64px; }
-    .showcase-secondary {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    .showcase-img {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      background: #1e1e1e;
-      position: relative;
-      aspect-ratio: 4 / 3;
-    }
-    .showcase-img img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      object-position: top left;
-    }
-    .terminal-preview { background: #171b1d; }
-    .terminal-preview img { object-fit: contain; object-position: center; }
-    .img-label {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      font-size: 11px;
-      font-weight: 500;
-      color: #ccc;
-      background: rgba(0,0,0,0.6);
-      padding: 3px 10px;
-      border-radius: 4px;
-      backdrop-filter: blur(4px);
-    }
-    @media (max-width: 640px) {
-      .showcase-secondary { grid-template-columns: 1fr; }
-    }
-    .evo {
-      padding-top: 32px;
-      border-top: 1px solid var(--border);
-    }
-    .evo h2 {
-      font-size: 20px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      margin-bottom: 12px;
-    }
-    .evo p {
-      font-size: 14px;
-      color: var(--text-secondary);
-      line-height: 1.7;
-      margin-bottom: 16px;
-    }
-    .chain {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 15px;
-      color: var(--text);
-      letter-spacing: 0.02em;
-      margin-bottom: 12px;
-    }
-    .small { font-size: 13px; color: var(--text-tertiary); }
-
-    @media (max-width: 640px) {
-      .hero-split { flex-direction: column; gap: 24px; }
-      .hero-img { width: 200px; }
-      .grid { grid-template-columns: 1fr; }
-      .hero-text h1 { font-size: 32px; }
-      .showcase-secondary { grid-template-columns: 1fr; }
-    }
-  </style>
 </Base>
+
+<script>
+  const film = document.querySelector<HTMLVideoElement>('#pet-film');
+  if (film) {
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.6) return;
+      observer.disconnect();
+      if (!motion.matches && document.visibilityState === 'visible') {
+        void film.play().catch(() => { /* Native controls allow manual playback. */ });
+      }
+    }, { threshold: 0.6 });
+    observer.observe(film);
+    motion.addEventListener('change', () => { if (motion.matches) film.pause(); });
+  }
+</script>
+
+<style>
+  :global(body:has(.hero) main), :global(body:has(.hero) .nav-inner) { max-width: 1024px; }
+  :global(body:has(.hero) main) { padding-top: 48px; }
+  figure { margin: 0; min-width: 0; }
+  .hero, .codex, .evolution { display: grid; align-items: center; gap: clamp(24px, 4vw, 58px); }
+  .hero { grid-template-columns: .83fr 1.17fr; margin-bottom: 54px; }
+  h1 { font: 700 clamp(46px, 5vw, 64px)/1.05 'JetBrains Mono', monospace; letter-spacing: -.075em; margin: 0 0 18px; }
+  h2 { font-size: 22px; line-height: 1.24; letter-spacing: -.035em; margin: 0 0 8px; }
+  p { color: var(--text-secondary); font-size: 15px; line-height: 1.6; margin: 0; }
+  .hero-copy p { font-size: 17px; max-width: 35ch; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .cta a { display: inline-flex; align-items: center; padding: 10px 19px; font-size: 14px; font-weight: 550; border-radius: 7px; }
+  .btn-primary { background: var(--text); color: var(--bg); }
+  .btn-secondary { border: 1px solid var(--border); color: var(--text); }
+  .cta a:hover { text-decoration: none; opacity: .8; }
+  .film video { display: block; width: 100%; height: auto; background: #16242b; border-radius: 12px; }
+  .film figcaption, .codex figcaption { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+  .screens { display: grid; grid-template-columns: 4fr 6fr; gap: 22px; }
+  .shot { height: clamp(248px, 27vw, 312px); display: grid; place-items: center; padding: 14px; border-radius: 10px; }
+  .shot img { display: block; max-width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+  .handheld { background: #efefdf; }
+  .handheld img { width: auto; border-radius: 8px; box-shadow: 0 3px 8px #35372626; }
+  .terminal, .codex-shot { background: #171b1d; }
+  .terminal { padding: 8px; }
+  .terminal img { width: 100%; }
+  .screens figcaption { padding-top: 15px; }
+  .screens p { max-width: 48ch; }
+  .codex, .evolution { margin-top: 40px; padding-top: 34px; border-top: 1px solid var(--border); }
+  .codex { grid-template-columns: .74fr 1.26fr; }
+  .codex-shot { display: block; overflow: hidden; border-radius: 9px; }
+  .codex-shot img { width: 100%; height: auto; display: block; }
+  .text-link { display: inline-block; margin-top: 12px; font-size: 14px; font-weight: 600; }
+  .evolution { grid-template-columns: 1fr auto; }
+  .interactive { width: 260px; }
+  .chain { margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text); }
+  @media (max-width: 700px) {
+    .hero, .codex, .evolution, .screens { grid-template-columns: 1fr; }
+    .hero { gap: 24px; margin-bottom: 32px; }
+    .hero-copy p { max-width: none; }
+    .shot { height: 280px; }
+    .interactive { justify-self: center; max-width: 100%; }
+  }
+</style>
