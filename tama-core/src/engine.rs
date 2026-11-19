@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Timelike, Utc};
+use chrono::{DateTime, Duration, Utc};
 use rand::Rng;
 
 use crate::characters::CharacterStats;
@@ -102,24 +102,17 @@ pub fn check_care_deadlines(state: &mut PetState, now: DateTime<Utc>) {
 ///   `pending_lights_deadline` (if none exists) so the player can turn them off.
 /// - If the pet should be sleeping and lights are already off: sets `is_sleeping = true`.
 pub fn check_sleep(state: &mut PetState, stats: &CharacterStats, now: DateTime<Utc>) {
-    let hour = now.hour() as u8;
-
-    let should_sleep = if stats.sleep_hour > stats.wake_hour {
-        // Sleep window spans midnight: e.g. sleep_hour=21, wake_hour=9
-        hour >= stats.sleep_hour || hour < stats.wake_hour
-    } else {
-        // Unusual case where sleep_hour <= wake_hour
-        hour >= stats.sleep_hour && hour < stats.wake_hour
-    };
-
-    if should_sleep {
-        if state.lights_on {
-            if state.pending_lights_deadline.is_none() {
-                state.pending_lights_deadline = Some(now + Duration::minutes(15));
-            }
-        } else {
-            state.is_sleeping = true;
+    if !stats.is_sleep_time(now) {
+        // A saved bedtime alert can outlive its night or a change of time zone.
+        state.pending_lights_deadline = None;
+        return;
+    }
+    if state.lights_on {
+        if state.pending_lights_deadline.is_none() {
+            state.pending_lights_deadline = Some(now + Duration::minutes(15));
         }
+    } else {
+        state.is_sleeping = true;
     }
 }
 
@@ -129,17 +122,8 @@ pub fn check_sleep(state: &mut PetState, stats: &CharacterStats, now: DateTime<U
 /// wakes the pet up: sets `is_sleeping = false`, `lights_on = true`,
 /// increments `age` by 1 (1 day = 1 year), and resets `snack_count_since_last_tick`.
 pub fn check_wake(state: &mut PetState, stats: &CharacterStats, now: DateTime<Utc>) {
-    let hour = now.hour() as u8;
-
-    let should_be_awake = if stats.sleep_hour > stats.wake_hour {
-        // Normal: awake window is wake_hour..sleep_hour
-        hour >= stats.wake_hour && hour < stats.sleep_hour
-    } else {
-        // Unusual case
-        hour >= stats.wake_hour || hour < stats.sleep_hour
-    };
-
-    if should_be_awake {
+    if !stats.is_sleep_time(now) {
+        state.pending_lights_deadline = None;
         state.is_sleeping = false;
         state.lights_on = true;
         state.age = state.age.saturating_add(1);

@@ -306,11 +306,11 @@ const EVOLUTION_INFO: Record<string, { ageThreshold?: number; minutesThreshold?:
 type SleepTone = "neutral" | "normal" | "alert" | "sleep";
 
 function minutesUntilHour(hour: number, now: Date): number {
-  const currentMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const targetMinutes = hour * 60;
-  let diff = targetMinutes - currentMinutes;
-  if (diff < 0) diff += 24 * 60;
-  return diff;
+  if (now.getHours() === hour && now.getMinutes() === 0) return 0;
+  const next = new Date(now);
+  next.setHours(hour, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return Math.ceil((next.getTime() - now.getTime()) / 60000);
 }
 
 function formatMinutes(mins: number): string {

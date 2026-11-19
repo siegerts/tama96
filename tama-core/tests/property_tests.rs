@@ -595,19 +595,16 @@ proptest! {
         // Create a time that's within the sleep window
         // Use sleep_hour + 1 (mod 24) to ensure we're in the sleep window
         let sleep_hour = stats.sleep_hour as u32;
-        let now = Utc.with_ymd_and_hms(2024, 6, 15, (sleep_hour + 1) % 24, 30, 0).unwrap();
+        let now = chrono::Local
+            .with_ymd_and_hms(2024, 6, 15, (sleep_hour + 1) % 24, 30, 0)
+            .unwrap()
+            .to_utc();
         state.last_tick = now - chrono::Duration::minutes(60);
 
-        // Simulate what tick() does for sleeping pets: only check_wake, no decay
-        // Since we're in the sleep window, check_wake should NOT wake the pet
-        engine::check_wake(&mut state, &stats, now);
-
-        // If pet is still sleeping (which it should be since we're in sleep window),
-        // hunger and happiness must be unchanged
-        if state.is_sleeping {
-            prop_assert_eq!(state.hunger, old_hunger, "hunger should not change during sleep");
-            prop_assert_eq!(state.happiness, old_happiness, "happiness should not change during sleep");
-        }
+        engine::tick(&mut state, now);
+        prop_assert!(state.is_sleeping);
+        prop_assert_eq!(state.hunger, old_hunger, "hunger should not change during sleep");
+        prop_assert_eq!(state.happiness, old_happiness, "happiness should not change during sleep");
     }
 }
 
