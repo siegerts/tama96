@@ -76,7 +76,7 @@ pub fn maybe_generate_discipline_call(state: &mut PetState, now: DateTime<Utc>) 
 pub fn check_discipline_deadline(state: &mut PetState, now: DateTime<Utc>) {
     if let Some(deadline) = state.pending_discipline_deadline {
         if now >= deadline {
-            state.discipline_mistakes += 1;
+            state.discipline_mistakes = state.discipline_mistakes.saturating_add(1);
             state.pending_discipline_deadline = None;
         }
     }
@@ -89,7 +89,7 @@ pub fn check_discipline_deadline(state: &mut PetState, now: DateTime<Utc>) {
 pub fn check_care_deadlines(state: &mut PetState, now: DateTime<Utc>) {
     if let Some(deadline) = state.pending_care_deadline {
         if now >= deadline {
-            state.care_mistakes += 1;
+            state.care_mistakes = state.care_mistakes.saturating_add(1);
             state.pending_care_deadline = None;
         }
     }
@@ -142,7 +142,7 @@ pub fn check_wake(state: &mut PetState, stats: &CharacterStats, now: DateTime<Ut
     if should_be_awake {
         state.is_sleeping = false;
         state.lights_on = true;
-        state.age += 1;
+        state.age = state.age.saturating_add(1);
         state.snack_count_since_last_tick = 0;
     }
 }

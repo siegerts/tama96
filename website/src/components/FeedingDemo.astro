@@ -1,0 +1,219 @@
+<div class="pet-demo">
+  <header><span>Kuchipatchi</span><span class="demo-counter">Adult</span></header>
+  <div class="demo-screen">
+    <canvas width="480" height="360" aria-label="Kuchipatchi feeding and 3D preview"></canvas>
+    <noscript><img src="/tama96-desktop.png" alt="Kuchipatchi on the desktop LCD" /></noscript>
+  </div>
+  <div class="demo-buttons"><button type="button" data-feed>Feed Kuchipatchi</button><button type="button" data-form>See in 3D ↗</button></div>
+  <span class="sr" aria-live="polite" data-message></span>
+</div>
+<script>
+  import artwork from "../../../assets/pet-frames.json";
+  import { animateEmergence } from "../../../assets/pet-emergence";
+  const root = document.querySelector<HTMLElement>(".pet-demo")!;
+  const canvas = root.querySelector("canvas")!;
+  const ctx = canvas.getContext("2d")!;
+  const counter = root.querySelector<HTMLElement>(".demo-counter")!;
+  const feed = root.querySelector<HTMLButtonElement>("[data-feed]")!;
+  const form = root.querySelector<HTMLButtonElement>("[data-form]")!;
+  const message = root.querySelector<HTMLElement>("[data-message]")!;
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  const ink = "#2d3320",
+    lcd = "#c4cfa1";
+  const heart = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."];
+  const rice = [
+    "....###....",
+    "..##...##..",
+    ".#...#...#.",
+    "###########",
+    ".#########.",
+    "..#######..",
+    "....###....",
+  ];
+  let stop = () => {};
+  let fed = false;
+  let in3d = false;
+
+  function sprite(rows: string[], x: number, y: number, unit: number, color: string) {
+    ctx.fillStyle = color;
+    rows.forEach((row, j) =>
+      [...row].forEach((v, i) => {
+        if (v === "#") ctx.fillRect(Math.round(x) + i * unit, Math.round(y) + j * unit, unit, unit);
+      }),
+    );
+  }
+  function mealFrame(elapsed: number) {
+    ctx.fillStyle = lcd;
+    ctx.fillRect(0, 0, 480, 360);
+    const bite = elapsed >= 760 && elapsed < 1280;
+    const y = bite && !motion.matches ? -6 : 0;
+    sprite(bite ? artwork.Kuchipatchi.gesture : artwork.Kuchipatchi.rest, 152, 40 + y, 11, ink);
+    if (elapsed > 0 && elapsed < 940) {
+      const t = Math.min(1, elapsed / 850);
+      sprite(rice, 54 + 83 * t, 165 - 30 * t - 34 * Math.sin(Math.PI * t), 4, ink);
+    }
+    for (let i = 0; i < 4; i++)
+      sprite(
+        heart,
+        163 + i * 43,
+        261 - (i === 3 && elapsed >= 940 && elapsed < 1250 ? 4 : 0),
+        4,
+        i < 3 || fed || elapsed >= 940 ? ink : "#a3af83",
+      );
+    ctx.fillStyle = ink;
+    ctx.textAlign = "center";
+    ctx.font = "500 18px Menlo, monospace";
+    ctx.fillText(elapsed >= 940 || fed ? "Hunger  4 / 4" : "Hunger  3 / 4", 240, 322);
+  }
+  function playMeal(announce: boolean) {
+    stop();
+    in3d = false;
+    fed = false;
+    counter.textContent = "Adult";
+    form.textContent = "See in 3D ↗";
+    feed.textContent = "Replay feeding";
+    let id = 0,
+      start: number | undefined;
+    const finish = () => {
+      fed = true;
+      mealFrame(1700);
+      if (announce) message.textContent = "Meal eaten. Hunger is four out of four.";
+    };
+    if (motion.matches) {
+      finish();
+      return;
+    }
+    const draw = (now: number) => {
+      start ??= now;
+      const time = now - start;
+      mealFrame(time);
+      if (time < 1600) id = requestAnimationFrame(draw);
+      else finish();
+    };
+    id = requestAnimationFrame(draw);
+    stop = () => cancelAnimationFrame(id);
+  }
+  feed.addEventListener("click", () => playMeal(true));
+  form.addEventListener("click", () => {
+    stop();
+    in3d = true;
+    counter.textContent = "3D form";
+    form.textContent = "Replay 3D ↻";
+    feed.textContent = "Feed Kuchipatchi";
+    stop = animateEmergence(canvas, artwork.Kuchipatchi.rest, "Kuchipatchi", () => {
+      counter.textContent = "Drag to turn";
+      message.textContent = "Kuchipatchi is in 3D.";
+    });
+  });
+  mealFrame(0);
+  // Show one meal when the demo first enters view. The visitor controls replays.
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      observer.disconnect();
+      if (!motion.matches && !in3d && feed.textContent === "Feed Kuchipatchi") {
+        const timer = window.setTimeout(() => playMeal(false), 950);
+        stop = () => clearTimeout(timer);
+      }
+    },
+    { threshold: 0.5 },
+  );
+  observer.observe(root);
+  motion.addEventListener("change", () => {
+    if (motion.matches && !in3d) {
+      stop();
+      mealFrame(fed ? 1700 : 0);
+    }
+  });
+  window.addEventListener(
+    "pagehide",
+    () => {
+      stop();
+      observer.disconnect();
+    },
+    { once: true },
+  );
+</script>
+<style>
+  .pet-demo {
+    width: 100%;
+    background: #dfcc81;
+    color: #373d29;
+    border: 1px solid #bbab72;
+    border-radius: 19px;
+    padding: 12px;
+    box-shadow:
+      inset 0 2px 0 #f1e2af,
+      0 4px 0 #b1a36e,
+      0 18px 32px -20px #453f29a8;
+  }
+  .pet-demo header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0 3px 7px;
+    font:
+      600 12px/1.4 Menlo,
+      monospace;
+  }
+  .demo-counter {
+    font-weight: 400;
+    font-size: 10px;
+  }
+  .demo-screen {
+    overflow: hidden;
+    background: #c4cfa1;
+    border: 3px solid #7d845d;
+    border-radius: 7px;
+  }
+  .demo-screen canvas,
+  .demo-screen img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .demo-screen canvas[role="slider"] {
+    cursor: grab;
+    touch-action: none;
+  }
+  .demo-screen canvas:focus-visible {
+    outline: 2px solid #b4deaa;
+    outline-offset: -3px;
+  }
+  .demo-buttons {
+    display: flex;
+    gap: 7px;
+    margin-top: 10px;
+  }
+  .demo-buttons button {
+    border: 1px solid #777a50;
+    border-radius: 5px;
+    background: #f0e6af;
+    color: inherit;
+    padding: 7px 5px;
+    flex: 1;
+    cursor: pointer;
+    font:
+      600 10px/1.3 Menlo,
+      monospace;
+    box-shadow: 0 2px 0 #aaa065;
+  }
+  .demo-buttons button:first-child {
+    flex: 1.4;
+  }
+  .demo-buttons button:focus-visible {
+    outline: 2px solid #283829;
+    outline-offset: 2px;
+  }
+  .demo-buttons button:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 #aaa065;
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+</style>

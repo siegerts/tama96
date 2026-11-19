@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-const base = import.meta.env.BASE_URL;
+import FeedingDemo from "../components/FeedingDemo.astro";
 ---
 
 <Base title="tama96 — virtual pet for your desktop">
@@ -15,7 +15,7 @@ const base = import.meta.env.BASE_URL;
         </div>
       </div>
       <div class="hero-img">
-        <img src="/tama96-desktop.png" alt="tama96 desktop app" />
+        <FeedingDemo />
       </div>
     </div>
   </section>
@@ -27,7 +27,7 @@ const base = import.meta.env.BASE_URL;
     </article>
     <article>
       <h3>Terminal</h3>
-      <p>Braille pixel sprites rendered in your terminal. Runs standalone or connects to the desktop app as a client. Single binary, zero dependencies.</p>
+      <p>Animated pixel pets with keyboard care controls. Runs standalone or connects to the desktop app as a client. Single binary, zero dependencies.</p>
     </article>
     <article>
       <h3>AI agent</h3>
@@ -37,7 +37,7 @@ const base = import.meta.env.BASE_URL;
 
   <section class="showcase">
     <div class="showcase-secondary">
-      <div class="showcase-img">
+      <div class="showcase-img terminal-preview">
         <img src="/tama96-tui.png" alt="tama96 terminal TUI" />
         <span class="img-label">Terminal</span>
       </div>
@@ -81,9 +81,7 @@ const base = import.meta.env.BASE_URL;
     }
     .hero-img {
       flex-shrink: 0;
-      width: 240px;
-      border-radius: 12px;
-      overflow: hidden;
+      width: 284px;
     }
     .hero-img img { width: 100%; display: block; }
     .cta { display: flex; gap: 12px; }
@@ -165,6 +163,8 @@ const base = import.meta.env.BASE_URL;
       object-fit: cover;
       object-position: top left;
     }
+    .terminal-preview { background: #171b1d; }
+    .terminal-preview img { object-fit: contain; object-position: center; }
     .img-label {
       position: absolute;
       bottom: 10px;

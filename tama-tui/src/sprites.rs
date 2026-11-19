@@ -1,3 +1,5 @@
+use serde::Deserialize;
+use std::{collections::HashMap, sync::LazyLock, time::Duration};
 use tama_core::state::{Character, LifeStage, PetState};
 
 /// Width and height of each sprite in pixels.
@@ -50,352 +52,150 @@ fn pixel(sprite: &Sprite, x: usize, y: usize) -> bool {
     (sprite[y] >> (SPRITE_W - 1 - x)) & 1 == 1
 }
 
-// ── Public API ──────────────────────────────────────────────────────────────
+#[derive(Deserialize)]
+#[serde(try_from = "[String; SPRITE_H]")]
+struct Bitmap(Sprite);
 
-/// Return the braille string for the current pet state.
-pub fn get_sprite(state: &PetState) -> String {
-    let sprite = select_sprite(state);
-    sprite_to_braille(sprite)
-}
+impl TryFrom<[String; SPRITE_H]> for Bitmap {
+    type Error = &'static str;
 
-fn select_sprite(state: &PetState) -> &'static Sprite {
-    if !state.is_alive { return &DEAD; }
-    if state.stage == LifeStage::Egg { return &EGG; }
-    if state.is_sleeping { return &SLEEPING; }
-    if state.is_sick { return &SICK; }
-    idle_sprite(&state.character)
-}
-
-fn idle_sprite(ch: &Character) -> &'static Sprite {
-    match ch {
-        Character::Babytchi      => &BABYTCHI,
-        Character::Marutchi      => &MARUTCHI,
-        Character::Tamatchi      => &TAMATCHI,
-        Character::Kuchitamatchi => &KUCHITAMATCHI,
-        Character::Mametchi      => &MAMETCHI,
-        Character::Ginjirotchi   => &GINJIROTCHI,
-        Character::Maskutchi     => &MASKUTCHI,
-        Character::Kuchipatchi   => &KUCHIPATCHI,
-        Character::Nyorotchi     => &NYOROTCHI,
-        Character::Tarakotchi    => &TARAKOTCHI,
-        Character::Oyajitchi     => &OYAJITCHI,
+    fn try_from(rows: [String; SPRITE_H]) -> Result<Self, Self::Error> {
+        let mut bits = [0; SPRITE_H];
+        for (row, cells) in bits.iter_mut().zip(rows) {
+            if cells.len() != SPRITE_W {
+                return Err("expected a 16-pixel row");
+            }
+            for pixel in cells.bytes() {
+                *row = (*row << 1)
+                    | match pixel {
+                        b'.' => 0,
+                        b'#' => 1,
+                        _ => return Err("unknown sprite pixel"),
+                    };
+            }
+        }
+        Ok(Self(bits))
     }
 }
 
-// Egg — oval with diagonal stripe pattern (like the real P1 egg)
-#[rustfmt::skip]
-const EGG: Sprite = [
-    0b0000001111000000,
-    0b0000111111110000,
-    0b0001110110111000,
-    0b0011111011011100,
-    0b0011101101111100,
-    0b0011110110111100,
-    0b0011101101111100,
-    0b0011111011011100,
-    0b0011110110111100,
-    0b0011101101111100,
-    0b0011111011011100,
-    0b0001110110111000,
-    0b0000111111110000,
-    0b0000001111000000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+#[derive(Deserialize)]
+struct Poses {
+    rest: Bitmap,
+    gesture: Option<Bitmap>,
+    sleeping: Option<Bitmap>,
+    sick: Option<Bitmap>,
+}
 
-// Babytchi — tiny round body, tuft on top, dot eyes, small mouth, stubby feet
-#[rustfmt::skip]
-const BABYTCHI: Sprite = [
-    0b0000000000000000,
-    0b0000000110000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001101111011000,
-    0b0001111111111000,
-    0b0001111001111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000001111000000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+static ART: LazyLock<HashMap<String, Poses>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../assets/pet-frames.json"))
+        .expect("invalid built-in pet artwork")
+});
 
-// Marutchi — round body, big oval eyes, wide smile, small feet
-#[rustfmt::skip]
-const MARUTCHI: Sprite = [
-    0b0000000000000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0011100110011100,
-    0b0011100110011100,
-    0b0011111111111100,
-    0b0011100000011100,
-    0b0011110000111100,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000011001100000,
-    0b0000011001100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+pub struct PetFrame {
+    bitmap: &'static Bitmap,
+    padding: usize,
+    pub redraw_after: Duration,
+}
 
-// Tamatchi — tall oval body, pointy ear tufts, round eyes, smile
-#[rustfmt::skip]
-const TAMATCHI: Sprite = [
-    0b0001100000011000,
-    0b0000110000110000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001101111011000,
-    0b0001101111011000,
-    0b0001111111111000,
-    0b0001110000111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000001111000000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+impl PetFrame {
+    fn still(bitmap: &'static Bitmap) -> Self {
+        Self {
+            bitmap,
+            padding: 0,
+            redraw_after: Duration::from_secs(1),
+        }
+    }
 
-// Kuchitamatchi — round body, beak/bill protruding right, dot eyes
-#[rustfmt::skip]
-const KUCHITAMATCHI: Sprite = [
-    0b0000000000000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001101111011000,
-    0b0001111111111000,
-    0b0001111111111000,
-    0b0001111111111110,
-    0b0001111111111110,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+    pub fn render(&self, large: bool, right: bool) -> String {
+        let pixels = if right { self.bitmap.0.map(u16::reverse_bits) } else { self.bitmap.0 };
+        if large { self.blocks(&pixels) } else { self.braille_pixels(&pixels) }
+    }
 
-// Mametchi — ear-cap on top (wider than head), round eyes, happy mouth
-#[rustfmt::skip]
-const MAMETCHI: Sprite = [
-    0b0000000000000000,
-    0b0011111111111100,
-    0b0011111111111100,
-    0b0001111111111000,
-    0b0001111111111000,
-    0b0001101111011000,
-    0b0001101111011000,
-    0b0001111111111000,
-    0b0001110000111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+    /// One terminal column per pixel, with two pixel rows in each character.
+    fn blocks(&self, pixels: &Sprite) -> String {
+        (0..SPRITE_H).step_by(2).map(|y| {
+            let mut row = " ".repeat(self.padding * 2);
+            for x in 0..SPRITE_W {
+                row.push(match (pixel(pixels, x, y), pixel(pixels, x, y + 1)) {
+                    (true, true) => '█',
+                    (true, false) => '▀',
+                    (false, true) => '▄',
+                    (false, false) => ' ',
+                });
+            }
+            row
+        }).collect::<Vec<_>>().join("\n")
+    }
 
-// Ginjirotchi — round body, small horns/bumps on top, gentle face
-#[rustfmt::skip]
-const GINJIROTCHI: Sprite = [
-    0b0000000000000000,
-    0b0000010000100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0011011111101100,
-    0b0011011111101100,
-    0b0011111111111100,
-    0b0011111001111100,
-    0b0011111111111100,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+    fn braille_pixels(&self, pixels: &Sprite) -> String {
+        let sprite = sprite_to_braille(pixels);
+        if self.padding == 0 {
+            return sprite;
+        }
+        let spaces = " ".repeat(self.padding);
+        sprite
+            .lines()
+            .map(|line| format!("{spaces}{line}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
 
-// Maskutchi — angular head, rectangular eyes (mask-like), stern mouth
-#[rustfmt::skip]
-const MASKUTCHI: Sprite = [
-    0b0000000000000000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0011100011100100,
-    0b0011100011100100,
-    0b0011111111111100,
-    0b0011111111111100,
-    0b0011110000111100,
-    0b0011111111111100,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000010000100000,
-    0b0000110000110000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+pub fn pet_frame(state: &PetState, elapsed: Duration, bite_left: Duration) -> PetFrame {
+    if !state.is_alive {
+        return PetFrame::still(&ART["dead"].rest);
+    }
+    let egg = state.stage == LifeStage::Egg;
+    let poses = &ART[if egg {
+        "Egg"
+    } else {
+        crate::character_name(state)
+    }];
+    if state.is_sleeping || state.is_sick {
+        let bitmap = if egg {
+            &poses.rest
+        } else if state.is_sleeping {
+            poses.sleeping.as_ref().unwrap_or(&ART["sleeping"].rest)
+        } else {
+            poses.sick.as_ref().unwrap_or(&ART["sick"].rest)
+        };
+        return PetFrame::still(bitmap);
+    }
 
-// Kuchipatchi — chubby round body, duck bill, happy eyes
-#[rustfmt::skip]
-const KUCHIPATCHI: Sprite = [
-    0b0000000000000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0011011111101100,
-    0b0011111111111100,
-    0b0011111111111100,
-    0b0011111111111110,
-    0b0011111111111110,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000010000100000,
-    0b0000111001110000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+    let ms = elapsed.as_millis() as u64;
+    if let Some(gesture) = &poses.gesture {
+        if state.character == Character::Kuchipatchi {
+            if bite_left.is_zero() {
+                return PetFrame::still(&poses.rest);
+            }
+            return PetFrame {
+                bitmap: gesture,
+                padding: 0,
+                redraw_after: bite_left,
+            };
+        }
+        if state.character == Character::Marutchi && state.happiness < 3 {
+            return PetFrame::still(&poses.rest);
+        }
+        let beat = ms % 1500;
+        let (bitmap, next) = if beat < 1200 {
+            (&poses.rest, 1200)
+        } else {
+            (gesture, 1500)
+        };
+        return PetFrame {
+            bitmap,
+            padding: 0,
+            redraw_after: Duration::from_millis(next - beat),
+        };
+    }
 
-// Nyorotchi — snake/worm, long wavy body, small head with eyes
-#[rustfmt::skip]
-const NYOROTCHI: Sprite = [
-    0b0000000000000000,
-    0b0000000000000000,
-    0b0000111110000000,
-    0b0001111111000000,
-    0b0001101101000000,
-    0b0001111111000000,
-    0b0001110011000000,
-    0b0000111110000000,
-    0b0000011100000000,
-    0b0000001110000000,
-    0b0000011111000000,
-    0b0000111111100000,
-    0b0001111111110000,
-    0b0000111111100000,
-    0b0000011111000000,
-    0b0000000000000000,
-];
-
-// Tarakotchi — antennae on top, round body, frowning mouth, wide feet
-#[rustfmt::skip]
-const TARAKOTCHI: Sprite = [
-    0b0000100000010000,
-    0b0000010000100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0011111111111100,
-    0b0011011111101100,
-    0b0011111111111100,
-    0b0011110000111100,
-    0b0011111111111100,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000010000100000,
-    0b0000111001110000,
-    0b0000000000000000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
-
-// Oyajitchi — bald head, moustache, old man face
-#[rustfmt::skip]
-const OYAJITCHI: Sprite = [
-    0b0000001111000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001101111011000,
-    0b0001101111011000,
-    0b0001111111111000,
-    0b0001100110011000,
-    0b0001111001111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
-
-// Sleeping — generic sleeping pose, closed eyes, z's
-#[rustfmt::skip]
-const SLEEPING: Sprite = [
-    0b0000000000000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001110110111000,
-    0b0001111111111000,
-    0b0001111111111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000000000000000,
-    0b0000000000111000,
-    0b0000000001000000,
-    0b0000000000011000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
-
-// Sick — sweat drop, X eyes, wavy mouth
-#[rustfmt::skip]
-const SICK: Sprite = [
-    0b0000000000010000,
-    0b0000011111101000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001010110101000,
-    0b0001111111111000,
-    0b0001111001111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000001111000000,
-    0b0000010000100000,
-    0b0000010000100000,
-    0b0000000000000000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
-
-// Dead — ghost/angel with halo, X eyes, wavy bottom
-#[rustfmt::skip]
-const DEAD: Sprite = [
-    0b0000001111000000,
-    0b0000010000100000,
-    0b0000001111000000,
-    0b0000011111100000,
-    0b0000111111110000,
-    0b0001111111111000,
-    0b0001010110101000,
-    0b0001111111111000,
-    0b0001111001111000,
-    0b0001111111111000,
-    0b0000111111110000,
-    0b0000011111100000,
-    0b0000010101010000,
-    0b0000001010100000,
-    0b0000000000000000,
-    0b0000000000000000,
-];
+    PetFrame {
+        bitmap: &poses.rest,
+        padding: [0, 1, 0, 2][(elapsed.as_secs() % 4) as usize],
+        redraw_after: Duration::from_millis(1000 - ms % 1000),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -405,12 +205,13 @@ mod tests {
 
     #[test]
     fn braille_output_dimensions() {
-        let s = sprite_to_braille(&EGG);
+        let s = sprite_to_braille(&ART["Egg"].rest.0);
         let lines: Vec<&str> = s.lines().collect();
         assert_eq!(lines.len(), 4, "expected 4 lines of braille");
         for (i, line) in lines.iter().enumerate() {
             assert_eq!(
-                line.chars().count(), 8,
+                line.chars().count(),
+                8,
                 "line {i} should have 8 braille chars, got {}",
                 line.chars().count()
             );
@@ -431,9 +232,9 @@ mod tests {
     #[test]
     fn get_sprite_returns_egg_for_new_egg() {
         let state = PetState::new_egg(Utc::now());
-        let s = get_sprite(&state);
+        let s = pet_frame(&state, Duration::ZERO, Duration::ZERO).render(false, false);
         assert!(!s.is_empty());
-        let expected = sprite_to_braille(&EGG);
+        let expected = sprite_to_braille(&ART["Egg"].rest.0);
         assert_eq!(s, expected);
     }
 
@@ -442,23 +243,88 @@ mod tests {
         let mut state = PetState::new_egg(Utc::now());
         state.is_alive = false;
         state.stage = LifeStage::Dead;
-        let s = get_sprite(&state);
-        let expected = sprite_to_braille(&DEAD);
+        let s = pet_frame(&state, Duration::ZERO, Duration::ZERO).render(false, false);
+        let expected = sprite_to_braille(&ART["dead"].rest.0);
         assert_eq!(s, expected);
     }
 
     #[test]
     fn all_characters_have_sprites() {
         let chars = [
-            Character::Babytchi, Character::Marutchi, Character::Tamatchi,
-            Character::Kuchitamatchi, Character::Mametchi, Character::Ginjirotchi,
-            Character::Maskutchi, Character::Kuchipatchi, Character::Nyorotchi,
-            Character::Tarakotchi, Character::Oyajitchi,
+            Character::Babytchi,
+            Character::Marutchi,
+            Character::Tamatchi,
+            Character::Kuchitamatchi,
+            Character::Mametchi,
+            Character::Ginjirotchi,
+            Character::Maskutchi,
+            Character::Kuchipatchi,
+            Character::Nyorotchi,
+            Character::Tarakotchi,
+            Character::Oyajitchi,
         ];
-        for ch in &chars {
-            let sprite = idle_sprite(ch);
-            let s = sprite_to_braille(sprite);
-            assert!(!s.is_empty(), "sprite for {:?} should not be empty", ch);
+        let mut state = PetState::new_egg(Utc::now());
+        state.stage = LifeStage::Adult;
+        for ch in chars {
+            state.character = ch;
+            let frame = pet_frame(&state, Duration::ZERO, Duration::ZERO);
+            assert!(
+                frame.bitmap.0.iter().any(|&row| row != 0),
+                "blank sprite for {:?}",
+                state.character
+            );
+        }
+    }
+
+    #[test]
+    fn gestures_follow_mood_and_feeding_and_yield_to_status() {
+        let mut state = PetState::new_egg(Utc::now());
+        state.stage = LifeStage::Adult;
+        let pulse = Duration::from_millis(1200);
+        let bite = Duration::from_millis(450);
+        let zero = Duration::ZERO;
+        for character in [
+            Character::Babytchi,
+            Character::Marutchi,
+            Character::Tamatchi,
+            Character::Kuchipatchi,
+        ] {
+            state.character = character;
+            state.happiness = 4;
+            state.is_sleeping = false;
+            state.is_sick = false;
+            let poses = &ART[crate::character_name(&state)];
+            let frame = |s: &PetState, elapsed, feeding| pet_frame(s, elapsed, feeding).bitmap.0;
+            assert_eq!(frame(&state, zero, zero), poses.rest.0);
+            if state.character == Character::Kuchipatchi {
+                assert_eq!(frame(&state, pulse, zero), poses.rest.0);
+                assert_eq!(frame(&state, zero, bite), poses.gesture.as_ref().unwrap().0);
+            } else {
+                assert_eq!(
+                    frame(&state, pulse, zero),
+                    poses.gesture.as_ref().unwrap().0
+                );
+                assert_eq!(
+                    frame(&state, Duration::from_millis(1500), zero),
+                    poses.rest.0
+                );
+            }
+            if state.character == Character::Marutchi {
+                state.happiness = 2;
+                assert_eq!(frame(&state, pulse, zero), poses.rest.0);
+                state.happiness = 3;
+                assert_eq!(
+                    frame(&state, pulse, zero),
+                    poses.gesture.as_ref().unwrap().0
+                );
+            }
+            state.is_sick = true;
+            assert_eq!(frame(&state, pulse, bite), poses.sick.as_ref().unwrap().0);
+            state.is_sleeping = true;
+            assert_eq!(
+                frame(&state, pulse, bite),
+                poses.sleeping.as_ref().unwrap().0
+            );
         }
     }
 }

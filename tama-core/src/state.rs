@@ -63,6 +63,9 @@ pub struct PetState {
     pub character: Character,
     pub teen_type: Option<TeenType>,
 
+    #[serde(default)]
+    pub game: crate::actions::GameProgress,
+
     // Meters
     pub hunger: u8,
     pub happiness: u8,
@@ -103,6 +106,7 @@ impl PetState {
             stage: LifeStage::Egg,
             character: Character::Babytchi,
             teen_type: None,
+            game: Default::default(),
             hunger: 0,
             happiness: 0,
             discipline: 0,

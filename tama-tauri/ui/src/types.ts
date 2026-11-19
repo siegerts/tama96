@@ -35,6 +35,7 @@ export type ActionType =
   | "GetStatus";
 
 export interface PetState {
+  game: GameProgress;
   stage: LifeStage;
   character: Character;
   teen_type: TeenType | null;
@@ -89,4 +90,13 @@ export interface AgentPermissions {
   enabled: boolean;
   allowed_actions: Record<string, ActionPermission>;
   action_log: ActionLogEntry[];
+}
+
+export interface GameProgress {
+  turn: number;
+  hits: number;
+  look: Choice | null;
+  matched: boolean;
+  stars: number;
+  best: number;
 }

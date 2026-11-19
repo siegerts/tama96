@@ -87,6 +87,16 @@ pub fn play_game(
 }
 
 #[tauri::command]
+pub fn guess_direction(pet: State<'_, SharedPetState>, guess: actions::Guess) -> Result<PetState, String> {
+    let mut state = pet.lock().map_err(|e| e.to_string())?;
+    let mut next = state.clone();
+    actions::guess_direction(&mut next, guess).map_err(|e| format!("{e:?}"))?;
+    persistence::save(&next, &state_path()).map_err(|e| e.to_string())?;
+    *state = next.clone();
+    Ok(next)
+}
+
+#[tauri::command]
 pub fn discipline(pet: State<'_, SharedPetState>) -> Result<PetState, String> {
     {
         let mut state = pet.lock().map_err(|e| e.to_string())?;

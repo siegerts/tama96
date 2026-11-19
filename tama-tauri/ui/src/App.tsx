@@ -3,6 +3,7 @@ import { usePetState } from "./hooks/usePetState";
 import PetDisplay from "./components/PetDisplay";
 import DeathScreen from "./components/DeathScreen";
 import PermissionsPanel from "./components/PermissionsPanel";
+import ConnectPanel from "./components/ConnectPanel";
 import AboutPanel from "./components/AboutPanel";
 
 const SHELL_COLORS = [
@@ -35,10 +36,11 @@ function loadShellColor(): string {
 function App() {
   const {
     state, loading, error,
-    feedMeal, feedSnack, playGame, discipline,
+    feedMeal, feedSnack, guessDirection, discipline,
     giveMedicine, cleanPoop, toggleLights, hatchNewEgg,
   } = usePetState();
   const [showSettings, setShowSettings] = useState(false);
+  const [showConnect, setShowConnect] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [shellColor, setShellColor] = useState(loadShellColor);
@@ -80,10 +82,11 @@ function App() {
         <DeathScreen state={state} onHatchNewEgg={hatchNewEgg} />
       ) : (
         <PetDisplay
+          key={state.stage_start_time}
           state={state}
           feedMeal={feedMeal}
           feedSnack={feedSnack}
-          playGame={playGame}
+          guessDirection={guessDirection}
           discipline={discipline}
           giveMedicine={giveMedicine}
           cleanPoop={cleanPoop}
@@ -120,20 +123,22 @@ function App() {
             aria-label="Agent permissions"
             title="Agent Permissions"
           >
-            settings
+            Settings
           </button>
         </div>
+        <button onClick={() => setShowConnect(true)} style={cfgStyle}>Connect Codex</button>
         <button
           onClick={() => setShowAbout(true)}
           style={cfgStyle}
           aria-label="About tama96"
           title="About"
         >
-          info
+          About
         </button>
       </div>
 
-      {showSettings && <PermissionsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && <PermissionsPanel onClose={() => setShowSettings(false)} onConnect={() => { setShowSettings(false); setShowConnect(true); }} />}
+      {showConnect && <ConnectPanel onClose={() => setShowConnect(false)} />}
       {showAbout && <AboutPanel onClose={() => setShowAbout(false)} />}
     </div >
   );
@@ -158,17 +163,18 @@ const bottomRow: React.CSSProperties = {
   marginTop: 4,
   marginBottom: 2,
   width: "100%",
-  paddingLeft: 8,
-  paddingRight: 8,
+  boxSizing: "border-box",
+  paddingLeft: 2,
+  paddingRight: 2,
 };
 
 const cfgStyle: React.CSSProperties = {
   background: "none",
   border: "none",
   cursor: "pointer",
-  fontSize: 9,
+  fontSize: 10,
   fontFamily: "monospace",
-  color: "#0004",
+  color: "#20241f",
   padding: "2px 4px",
 };
 

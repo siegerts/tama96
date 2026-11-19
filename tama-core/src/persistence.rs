@@ -131,11 +131,9 @@ fn apply_catchup(state: &mut PetState, now: DateTime<Utc>) {
     }
 
     // For each elapsed minute, advance the simulation by one tick
-    for i in 1..=elapsed_minutes {
-        let tick_time = state.last_tick + Duration::minutes(i);
-        // Don't tick past `now`
-        let t = if tick_time > now { now } else { tick_time };
-        engine::tick(state, t);
+    let start = state.last_tick;
+    for minute in 1..=elapsed_minutes {
+        engine::tick(state, start + Duration::minutes(minute));
 
         // Stop early if the pet died during catch-up
         if !state.is_alive {
@@ -276,6 +274,22 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tama96_test_{}", rand::random::<u64>()));
         fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn catchup_ticks_each_minute_and_handles_full_mistake_counters() {
+        let start = Utc::now();
+        let mut pet = PetState::new_egg(start);
+        apply_catchup(&mut pet, start + Duration::minutes(6));
+        assert_eq!(pet.stage_start_time, start + Duration::minutes(5));
+
+        pet.care_mistakes = u8::MAX;
+        pet.discipline_mistakes = u8::MAX;
+        pet.pending_care_deadline = Some(pet.last_tick);
+        pet.pending_discipline_deadline = Some(pet.last_tick);
+        apply_catchup(&mut pet, start + Duration::minutes(7));
+        assert_eq!(pet.care_mistakes, u8::MAX);
+        assert_eq!(pet.discipline_mistakes, u8::MAX);
     }
 
     #[test]

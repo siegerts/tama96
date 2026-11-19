@@ -15,23 +15,27 @@ import Base from '../layouts/Base.astro';
     <p>The LCD screen has two rows of icons you can click (or use keyboard shortcuts in the TUI).</p>
     <h3>Top row</h3>
     <table><thead><tr><th>Icon</th><th>Name</th><th>What it does</th></tr></thead><tbody>
-      <tr><td>Fork/knife</td><td>Feed</td><td>Meal restores 1 hunger (+1 weight). Snack restores 1 happiness (+2 weight). Can't feed a sick pet.</td></tr>
-      <tr><td>Diamond</td><td>Light</td><td>Toggle lights. The desktop info strip shows the next bedtime, and bedtime starts with a lights-off warning.</td></tr>
-      <tr><td>Ball</td><td>Game</td><td>5-round guessing game. Win 3+ to gain 1 happiness. Burns 1 weight.</td></tr>
-      <tr><td>Cross</td><td>Medicine</td><td>2 doses to cure sickness. Only works when sick.</td></tr>
+      <tr><td>Meal bowl</td><td>Feed</td><td>Meal restores 1 hunger (+1 weight). Snack restores 1 happiness (+2 weight). Can't feed a sick pet.</td></tr>
+      <tr><td>Bulb</td><td>Light</td><td>Toggle lights. The desktop info strip shows the next bedtime, and bedtime starts with a lights-off warning.</td></tr>
+      <tr><td>Die</td><td>Game</td><td>Choose left or right for five turns. Match three for a happiness heart. Each match earns a star when the game ends.</td></tr>
+      <tr><td>Capsule</td><td>Medicine</td><td>2 doses to cure sickness. Only works when sick.</td></tr>
     </tbody></table>
     <h3>Bottom row</h3>
     <table><thead><tr><th>Icon</th><th>Name</th><th>What it does</th></tr></thead><tbody>
       <tr><td>Bathtub</td><td>Clean</td><td>Removes one poop. 4+ poops makes your pet sick.</td></tr>
       <tr><td>Meter</td><td>Stats</td><td>Shows hunger, happiness, weight. Info only.</td></tr>
-      <tr><td>Person</td><td>Discipline</td><td>Scold when a discipline call appears (~10% chance per tick, 15min deadline).</td></tr>
-      <tr><td>!</td><td>Attention</td><td>Shows what needs attention: bedtime/lights, sickness, poop, or discipline. Info only.</td></tr>
+      <tr><td>Whistle</td><td>Discipline</td><td>Scold when a discipline call appears (~10% chance per tick, 15min deadline).</td></tr>
+      <tr><td>Bell</td><td>Attention</td><td>Shows what needs attention: bedtime/lights, sickness, poop, or discipline. Info only.</td></tr>
     </tbody></table>
   </section>
 
   <section>
+    <h2>Game rewards</h2>
+    <p>Earn three stars across completed games to unlock your pet’s 3D form. Open Game in the desktop app to replay it. Stars, your best score, and unfinished turns travel with the same pet between desktop and terminal.</p>
+  </section>
+  <section>
     <h2>Meters</h2>
-    <p>Hunger and happiness each have 4 hearts. They decay at rates that depend on your character. When either hits 0, a 15-minute care deadline starts. Miss it and you get a care mistake.</p>
+    <p>The top heart row shows hunger and the lower row shows happiness. Hover over a care icon or either row, or focus it with the keyboard, to reveal the labels. Each meter has four hearts. They decay at rates that depend on your character. When either hits 0, a 15-minute care deadline starts. Miss it and you get a care mistake.</p>
     <p>Discipline is 0-100%. Goes up 25% each time you successfully discipline.</p>
   </section>
 
@@ -64,7 +68,8 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
 
   <section>
     <h2>MCP / AI agent</h2>
-    <p>The desktop app bundles an MCP server that AI tools can connect to. Open settings in the app and click "Copy to clipboard" to get the config for your AI tool.</p>
+    <p>Open <strong>Connect Codex → Add to Codex</strong> in tama96. Setup uses your local Codex CLI and Node.js 18 or newer. Keep tama96 open, start a new Codex chat, and ask “How is my tama96 pet doing?”</p>
+    <p>For manual Codex setup, choose <strong>Manual setup → Copy TOML</strong>. For JSON-based clients, choose <strong>Other clients → Copy JSON</strong> and merge the server entry into your MCP configuration.</p>
     <p>Agent permissions are configurable per-action with rate limits. The master switch disables all agent access.</p>
   </section>
 
@@ -72,7 +77,7 @@ Special: Maskutchi (Tamatchi T2 path) after 4 days → Oyajitchi</pre>
     <h2>TUI keyboard shortcuts</h2>
     <table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody>
       <tr><td><code>f</code></td><td>Feed (then m for meal, s for snack)</td></tr>
-      <tr><td><code>g</code></td><td>Play game</td></tr>
+      <tr><td><code>g</code></td><td>Open the guessing game. Use ← or → to guess, Esc to pause, and Enter to play again.</td></tr>
       <tr><td><code>d</code></td><td>Discipline</td></tr>
       <tr><td><code>c</code></td><td>Clean poop</td></tr>
       <tr><td><code>l</code></td><td>Toggle lights</td></tr>

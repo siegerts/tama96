@@ -1,9 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 
 use tama_core::actions::{self, Choice};
 use tama_core::permissions;
@@ -62,18 +62,12 @@ fn err_response(msg: impl Into<String>) -> Response {
     }
 }
 
-fn save_and_snapshot(pet: &SharedPetState) -> Result<PetState, String> {
-    let state = pet.lock().map_err(|e| e.to_string())?;
-    persistence::save(&state, &state_path()).map_err(|e| e.to_string())?;
-    Ok(state.clone())
-}
-
 /// Map action string to ActionType for permission checking.
 fn action_type_for(action: &str) -> Option<ActionType> {
     match action {
         "feed_meal" => Some(ActionType::FeedMeal),
         "feed_snack" => Some(ActionType::FeedSnack),
-        "play_game" => Some(ActionType::PlayGame),
+        "play_game" | "guess_direction" => Some(ActionType::PlayGame),
         "discipline" => Some(ActionType::Discipline),
         "give_medicine" => Some(ActionType::GiveMedicine),
         "clean_poop" => Some(ActionType::CleanPoop),
@@ -85,11 +79,7 @@ fn action_type_for(action: &str) -> Option<ActionType> {
 
 // ── Request Handler ─────────────────────────────────────────────────────────
 
-fn handle_request(
-    req: &Request,
-    pet: &SharedPetState,
-    perms: &SharedPermissions,
-) -> Response {
+fn handle_request(req: &Request, pet: &SharedPetState, perms: &SharedPermissions, save_path: &Path) -> Response {
     let now = Utc::now();
 
     // Resolve action type
@@ -98,104 +88,66 @@ fn handle_request(
         None => return err_response(format!("unknown action: {}", req.action)),
     };
 
-    // Check permissions
-    {
-        let mut p = match perms.lock() {
-            Ok(p) => p,
-            Err(e) => return err_response(format!("lock error: {e}")),
-        };
-        if let Err(denied) = permissions::check_permission(&mut p, &action_type, now) {
-            return err_response(denied.to_string());
-        }
+    // Keep the permission check, action, and usage count in one transaction.
+    // Neither lock is held while waiting for a client to read or write.
+    let mut permissions = match perms.lock() {
+        Ok(permissions) => permissions,
+        Err(e) => return err_response(format!("lock error: {e}")),
+    };
+    if let Err(denied) = permissions::check_permission(&mut permissions, &action_type, now) {
+        return err_response(denied.to_string());
     }
-
-    // Execute action
-    let result = match req.action.as_str() {
-        "get_status" => {
-            let state = match pet.lock() {
-                Ok(s) => s.clone(),
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            // Log the action
-            if let Ok(mut p) = perms.lock() {
-                permissions::log_action(&mut p, action_type, now);
-            }
-            return ok_response(state);
+    let mut state = match pet.lock() {
+        Ok(state) => state,
+        Err(e) => return err_response(format!("lock error: {e}")),
+    };
+    if req.action == "guess_direction" {
+        let guess = match serde_json::from_value(req.params.clone()) {
+            Ok(guess) => guess,
+            Err(e) => return err_response(format!("invalid guess: {e}")),
+        };
+        let mut next = state.clone();
+        if let Err(e) = actions::guess_direction(&mut next, guess) {
+            return err_response(format!("{e:?}"));
         }
-        "feed_meal" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::feed_meal(&mut state).map_err(|e| format!("{e:?}"))
+        if let Err(e) = persistence::save(&next, save_path) {
+            return err_response(format!("save error: {e}"));
         }
-        "feed_snack" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::feed_snack(&mut state).map_err(|e| format!("{e:?}"))
+        if next.game.turn % 5 == 0 {
+            permissions::log_action(&mut permissions, action_type, now);
         }
-        "play_game" => {
-            // Parse moves from params
+        *state = next.clone();
+        return ok_response(next);
+    }
+    let result = match action_type {
+        ActionType::GetStatus => Ok(()),
+        ActionType::FeedMeal => actions::feed_meal(&mut state).map(drop),
+        ActionType::FeedSnack => actions::feed_snack(&mut state).map(drop),
+        ActionType::PlayGame => {
             let moves: [Choice; 5] = match serde_json::from_value(
                 req.params.get("moves").cloned().unwrap_or_default(),
             ) {
-                Ok(m) => m,
+                Ok(moves) => moves,
                 Err(e) => return err_response(format!("invalid moves param: {e}")),
             };
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::play_game(&mut state, moves).map(|_| actions::ActionResult::Fed).map_err(|e| format!("{e:?}"))
-            // Note: play_game returns GameResult, but we just need to know it succeeded
+            actions::play_game(&mut state, moves).map(drop)
         }
-        "discipline" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::discipline(&mut state).map_err(|e| format!("{e:?}"))
-        }
-        "give_medicine" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::give_medicine(&mut state).map_err(|e| format!("{e:?}"))
-        }
-        "clean_poop" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::clean_poop(&mut state).map_err(|e| format!("{e:?}"))
-        }
-        "toggle_lights" => {
-            let mut state = match pet.lock() {
-                Ok(s) => s,
-                Err(e) => return err_response(format!("lock error: {e}")),
-            };
-            actions::toggle_lights(&mut state, now).map_err(|e| format!("{e:?}"))
-        }
-        _ => return err_response(format!("unknown action: {}", req.action)),
+        ActionType::Discipline => actions::discipline(&mut state).map(drop),
+        ActionType::GiveMedicine => actions::give_medicine(&mut state).map(drop),
+        ActionType::CleanPoop => actions::clean_poop(&mut state).map(drop),
+        ActionType::ToggleLights => actions::toggle_lights(&mut state, now).map(drop),
     };
-
-    match result {
-        Ok(_) => {
-            // Log the action
-            if let Ok(mut p) = perms.lock() {
-                permissions::log_action(&mut p, action_type, now);
-            }
-            // Save and return snapshot
-            match save_and_snapshot(pet) {
-                Ok(state) => ok_response(state),
-                Err(e) => err_response(format!("save error: {e}")),
-            }
-        }
-        Err(e) => err_response(e),
+    if let Err(e) = result {
+        return err_response(format!("{e:?}"));
     }
+    let changed = action_type != ActionType::GetStatus;
+    permissions::log_action(&mut permissions, action_type, now);
+    if changed {
+        if let Err(e) = persistence::save(&state, save_path) {
+            return err_response(format!("save error: {e}"));
+        }
+    }
+    ok_response(state.clone())
 }
 
 // ── Public Entry Point ──────────────────────────────────────────────────────
@@ -234,7 +186,11 @@ pub async fn start_socket_server(pet: SharedPetState, perms: SharedPermissions) 
         eprintln!("[socket] failed to write port file: {e}");
     }
 
-    // Accept loop — one connection at a time
+    serve(listener, pet, perms).await;
+}
+
+async fn serve(listener: TcpListener, pet: SharedPetState, perms: SharedPermissions) {
+    // Each MCP session can keep its connection open across many tool calls.
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(conn) => conn,
@@ -246,35 +202,108 @@ pub async fn start_socket_server(pet: SharedPetState, perms: SharedPermissions) 
 
         eprintln!("[socket] connection from {peer}");
 
-        let (reader, mut writer) = stream.into_split();
-        let mut lines = BufReader::new(reader).lines();
+        let pet = pet.clone();
+        let perms = perms.clone();
+        tokio::spawn(async move {
+            serve_client(stream, pet, perms).await;
+            eprintln!("[socket] connection from {peer} closed");
+        });
+    }
+}
 
-        while let Ok(Some(line)) = lines.next_line().await {
-            let line = line.trim().to_string();
-            if line.is_empty() {
-                continue;
-            }
+async fn serve_client(stream: TcpStream, pet: SharedPetState, perms: SharedPermissions) {
+    let (reader, mut writer) = stream.into_split();
+    let mut lines = BufReader::new(reader).lines();
+    let save_path = state_path();
 
-            let response = match serde_json::from_str::<Request>(&line) {
-                Ok(req) => handle_request(&req, &pet, &perms),
-                Err(e) => err_response(format!("invalid JSON: {e}")),
-            };
-
-            let mut resp_json = match serde_json::to_string(&response) {
-                Ok(j) => j,
-                Err(e) => {
-                    eprintln!("[socket] serialize error: {e}");
-                    continue;
-                }
-            };
-            resp_json.push('\n');
-
-            if let Err(e) = writer.write_all(resp_json.as_bytes()).await {
-                eprintln!("[socket] write error: {e}");
-                break;
-            }
+    while let Ok(Some(line)) = lines.next_line().await {
+        let line = line.trim().to_string();
+        if line.is_empty() {
+            continue;
         }
 
-        eprintln!("[socket] connection from {peer} closed");
+        let response = match serde_json::from_str::<Request>(&line) {
+            Ok(req) => handle_request(&req, &pet, &perms, &save_path),
+            Err(e) => err_response(format!("invalid JSON: {e}")),
+        };
+
+        let mut resp_json = match serde_json::to_string(&response) {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("[socket] serialize error: {e}");
+                continue;
+            }
+        };
+        resp_json.push('\n');
+
+        if let Err(e) = writer.write_all(resp_json.as_bytes()).await {
+            eprintln!("[socket] write error: {e}");
+            break;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+    use tama_core::state::AgentPermissions;
+
+    #[test]
+    fn interactive_game_uses_one_permission_and_commits_five_distinct_turns() {
+        let birth = Utc::now();
+        let path = std::env::temp_dir().join(format!("tama96-rounds-{}-{}.json", std::process::id(), birth.timestamp_micros()));
+        let pet = Arc::new(Mutex::new(PetState::new_egg(birth)));
+        let mut limits = AgentPermissions::default();
+        limits.allowed_actions.get_mut(&ActionType::PlayGame).unwrap().max_per_hour = Some(1);
+        let permissions = Arc::new(Mutex::new(limits));
+        let guess = |turn| handle_request(&Request {
+            action: "guess_direction".into(),
+            params: serde_json::json!({ "turn": turn, "choice": "Left", "birth_time": birth }),
+        }, &pet, &permissions, &path);
+        assert!(guess(0).ok);
+        assert!(!guess(0).ok);
+        for turn in 1..5 { assert!(guess(turn).ok); }
+        let saved: PetState = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(saved, *pet.lock().unwrap());
+        assert_eq!(saved.game.stars, u32::from(saved.game.hits));
+        assert_eq!(saved.weight, 4);
+        assert_eq!(permissions.lock().unwrap().action_log.len(), 1);
+        assert!(!guess(5).ok);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn status_is_available_while_another_client_remains_connected() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let pet = Arc::new(Mutex::new(PetState::new_egg(Utc::now())));
+        let perms = Arc::new(Mutex::new(AgentPermissions::default()));
+        let server = tokio::spawn(serve(listener, pet, perms));
+
+        let mut first = BufReader::new(TcpStream::connect(address).await.unwrap());
+        let mut second = BufReader::new(TcpStream::connect(address).await.unwrap());
+        // The first client stays connected and can issue another request afterwards.
+        async fn status(client: &mut BufReader<TcpStream>) {
+            client
+                .get_mut()
+                .write_all(b"{\"action\":\"get_status\"}\n")
+                .await
+                .unwrap();
+            let mut response = String::new();
+            tokio::time::timeout(Duration::from_secs(3), client.read_line(&mut response))
+                .await
+                .expect("client should receive its own response")
+                .unwrap();
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&response).unwrap()["ok"],
+                true
+            );
+        }
+        status(&mut first).await;
+        status(&mut second).await;
+        status(&mut first).await;
+        server.abort();
     }
 }

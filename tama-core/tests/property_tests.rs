@@ -129,6 +129,7 @@ fn arb_valid_pet_state() -> BoxedStrategy<PetState> {
                 let (stage, character, teen_type, hunger, happiness, discipline, weight, age, care_mistakes, discipline_mistakes) = core;
                 let is_alive = stage != LifeStage::Dead;
                 PetState {
+                    game: Default::default(),
                     stage,
                     character,
                     teen_type,

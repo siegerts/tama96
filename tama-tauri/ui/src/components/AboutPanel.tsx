@@ -48,7 +48,6 @@ export default function AboutPanel({ onClose }: AboutPanelProps) {
         <div style={{ fontSize: 11, fontFamily: "monospace", color: "#999", lineHeight: 2 }}>
           <div>{version ? `v${version}` : "version..."}</div>
           <div>Made by <ExtLink href="https://x.com/siegerts">@siegerts</ExtLink></div>
-          <div>Built with <ExtLink href="https://kiro.dev/">Kiro</ExtLink></div>
           <div><ExtLink href="https://github.com/siegerts/tama96">GitHub</ExtLink></div>
         </div>
 
