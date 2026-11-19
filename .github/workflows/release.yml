@@ -173,11 +173,20 @@ jobs:
             const repo = context.repo.repo;
             const tag = context.ref.replace('refs/tags/', '');
 
-            const { data: release } = await github.rest.repos.getReleaseByTag({
+            // The tag endpoint can return 404 for drafts. The release list includes them.
+            const pages = github.paginate.iterator(github.rest.repos.listReleases, {
               owner,
               repo,
-              tag,
+              per_page: 100,
             });
+            let release;
+            for await (const { data } of pages) {
+              release = data.find(candidate => candidate.tag_name === tag && candidate.draft);
+              if (release) break;
+            }
+            if (!release) {
+              throw new Error(`No draft release found for ${tag}`);
+            }
 
             const { data: notes } = await github.request(
               'POST /repos/{owner}/{repo}/releases/generate-notes',
@@ -192,8 +201,8 @@ jobs:
               owner,
               repo,
               release_id: release.id,
+              // Preserve the tag association when editing the draft.
+              tag_name: tag,
               name: release.name || `tama96 ${tag}`,
               body: notes.body,
-              draft: release.draft,
-              prerelease: release.prerelease,
             });
